@@ -2,8 +2,9 @@
 setlocal
 chcp 65001 >nul
 cd /d "%~dp0"
+title DePalencify
 
-rem --- auto-update from GitHub (only if this folder is a git clone) ---
+rem --- auto-update from GitHub (only if this folder is a git clone) ---------
 if not exist ".git" goto :after_update
 if defined DEPALENCIFY_UPDATED goto :after_update
 where git >nul 2>&1
@@ -28,7 +29,10 @@ set "DEPALENCIFY_UPDATED=1"
 (goto) 2>nul & "%~f0"
 :after_update
 
-title Chamber data converter
+rem --- desktop and Start menu icon (created once, and again if this folder is moved) ---
+set "SEEN="
+if exist ".shortcut_made" set /p SEEN=<".shortcut_made"
+if not "%SEEN%"=="%CD%" if exist "launchers\make_shortcut.ps1" powershell -NoProfile -ExecutionPolicy Bypass -File "launchers\make_shortcut.ps1" "%CD%"
 
 rem --- find Python -------------------------------------------------------
 set "PY="

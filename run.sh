@@ -22,6 +22,9 @@ if [ -d .git ] && command -v git >/dev/null 2>&1 && [ -z "$DEPALENCIFY_UPDATED" 
     fi
 fi
 
+# --- desktop / menu icon (created once, and again if this folder is moved) ---
+[ -f launchers/make_shortcut.sh ] && bash launchers/make_shortcut.sh
+
 pause() { echo; read -r -p "Press Enter to close this window..." _; }
 
 PY=""

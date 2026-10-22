@@ -8,6 +8,9 @@ env/
 __pycache__/
 *.pyc
 
+# Shortcut flag
+.shortcut_made
+
 # Private or local data
 fiazall_data/
 last_answers.json
