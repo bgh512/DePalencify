@@ -1,0 +1,15 @@
+# Python environments (Windows .venv, Mac/Linux .venv_unix)
+.venv/
+.venv_unix/
+venv/
+env/
+
+# Python cache
+__pycache__/
+*.pyc
+
+# Private or local data
+fiazall_data/
+last_answers.json
+export/
+*.paf
