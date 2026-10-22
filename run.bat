@@ -2,6 +2,32 @@
 setlocal
 chcp 65001 >nul
 cd /d "%~dp0"
+
+rem --- auto-update from GitHub (only if this folder is a git clone) ---
+if not exist ".git" goto :after_update
+if defined DEPALENCIFY_UPDATED goto :after_update
+where git >nul 2>&1
+if errorlevel 1 goto :after_update
+echo Checking for updates...
+git fetch --quiet >nul 2>&1
+if errorlevel 1 (
+    echo (No connection, skipping update check.)
+    goto :after_update
+)
+set "BEHIND=0"
+for /f %%i in ('git rev-list --count HEAD..@{u} 2^>nul') do set "BEHIND=%%i"
+if "%BEHIND%"=="0" goto :after_update
+echo Update found. Installing...
+git pull --ff-only --quiet
+if errorlevel 1 (
+    echo (Could not update, probably because files were edited here. Running the current version.)
+    goto :after_update
+)
+echo Updated. Restarting...
+set "DEPALENCIFY_UPDATED=1"
+(goto) 2>nul & "%~f0"
+:after_update
+
 title Chamber data converter
 
 rem --- find Python -------------------------------------------------------

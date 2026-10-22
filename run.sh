@@ -2,6 +2,26 @@
 # DePalencify launcher for Mac and Linux. First run creates a private environment (.venv_unix) and installs what is needed.
 cd "$(dirname "$0")" || exit 1
 
+# --- auto-update from GitHub (only if this folder is a git clone) ---
+if [ -d .git ] && command -v git >/dev/null 2>&1 && [ -z "$DEPALENCIFY_UPDATED" ]; then
+    echo "Checking for updates..."
+    if git fetch --quiet 2>/dev/null; then
+        BEHIND=$(git rev-list --count 'HEAD..@{u}' 2>/dev/null || echo 0)
+        if [ "${BEHIND:-0}" -gt 0 ]; then
+            echo "Update found. Installing..."
+            if git pull --ff-only --quiet; then
+                echo "Updated. Restarting..."
+                export DEPALENCIFY_UPDATED=1
+                exec bash "$0" "$@"
+            else
+                echo "(Could not update, probably because files were edited here. Running the current version.)"
+            fi
+        fi
+    else
+        echo "(No connection, skipping update check.)"
+    fi
+fi
+
 pause() { echo; read -r -p "Press Enter to close this window..." _; }
 
 PY=""
