@@ -17,5 +17,4 @@ chmod +x run.sh run.command
 To download (Windows):
 git clone https://github.com/bgh512/DePalencify.git
 cd DePalencify
-chmod +x run.sh run.command
 ./run.sh
