@@ -17,9 +17,11 @@ DEFAULT_ANSWERS = {
     "averaging": False, "window_minutes": 2.0, "gap_minutes": 0.5, "final_gap_minutes": 0.5,
     "plot_o2": True,
     "plot_ocr": True, "ocr_mode": "od",                     # "raw", "od" or "percent"
+    "event_label_angle": 45,                                 # event label rotation in degrees: 0 = horizontal, 90 = vertical
     "plot_haems": False, "haems": [], "haem_mode": "delta",  # "abs", "delta", "conc" or "percent"
     "haem_per_od": True,                                     # divide the haem values (not "percent") by OD x volume x dilution when OD scaling is on
     "journal": "nature", "columns": 1, "height": 0.5,
+    "comparison_columns": 2, "comparison_height": 0.5,       # size of the side-by-side comparison figure
     "export_full": False, "export_spectra": False,
 }
 
@@ -186,7 +188,7 @@ class Config:
             "EVENT_LINE_ALPHA": 0.8,
             "EVENT_LABELS": True,
             "EVENT_LABELS_ON_TOP": True,
-            "EVENT_LABEL_ROTATION": 45,
+            "EVENT_LABEL_ROTATION": a["event_label_angle"],
             "EVENT_LABEL_FONTSIZE": fonts["tick"],
             "EVENT_LABEL_ANCHOR": "start",
             "EVENT_LABEL_OFFSET": style["event_label_offset"],

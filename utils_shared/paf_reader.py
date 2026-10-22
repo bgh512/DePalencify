@@ -431,30 +431,6 @@ def load_experiment_from_paf(path, spectral_datasets=("Cyt",), with_intensity=Fa
                                   "acquisition": paf.acquisition(), "notes": paf.notes()}
     return experiment
 
-
-def trim_experiment(experiment, end_time):
-    """Discard everything recorded after ``end_time`` (minutes), e.g. noise from a run that was never stopped."""
-    name = experiment["experiment_name"]
-    late = [e for e in experiment["metadata"].get("events", []) if e["time"] > end_time]
-    if late:
-        raise ValueError(f"{name}: cannot trim at {end_time:g} min because {len(late)} event(s) occur later.")
-    for key in ("CcO2", "CsO2", "VoO2"):
-        frame = experiment.get(key)
-        if frame is None:
-            continue
-        trimmed = frame.loc[frame[TIME_COLUMN].to_numpy(dtype=float) <= end_time].reset_index(drop=True)
-        if trimmed.empty:
-            raise ValueError(f"{name}: trimming {key} at {end_time:g} min leaves no data.")
-        experiment[key] = trimmed
-    for dataset_name_, dataset in experiment["raw_spectra"].items():
-        if not np.all(np.isfinite(dataset["time"])):
-            raise ValueError(f"{name}/{dataset_name_}: cannot trim because spectrum times are unavailable.")
-        keep = dataset["time"] <= end_time
-        for field in ("spectrum_indices", "time", "transmission", "intensity", "attenuation"):
-            if field in dataset:
-                dataset[field] = dataset[field][keep]
-    experiment["metadata"]["trimmed_after_minutes"] = end_time
-    return experiment
 # %% FORMAT NOTES ------------------------------------------------------------------------------------------------------------------------------------
 # * The file is a flat series of records, each starting 06 'Espana' 00 00 00 00 00 + a 16-byte class GUID. A header of
 #   length-prefixed UTF-16 strings follows (02 00 00 00, nchars:u32, chars): type ('DataItem', 'Measurement', 'Spectra: CCD',

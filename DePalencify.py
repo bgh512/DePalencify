@@ -32,7 +32,10 @@ from utils_shared.averaging import calculate_experiment_averages
 from utils_shared.individual_experiment_exporter import export_individual_experiment, read_saved_settings
 from utils_shared.individual_experiment_plotter import plot_experiment
 from utils_shared.normalisation import normalise_experiment, convert_to_percent
-from utils_shared.paf_reader import PafError, load_experiment_from_paf, read_experiment_summary, trim_experiment
+from utils_shared.comparison_plotter import plot_comparison
+from utils_shared.figure_layout import figure_size_inches
+from utils_shared.paf_reader import PafError, load_experiment_from_paf, read_experiment_summary
+from utils_shared.trimming import trim_experiment
 from utils_shared.questions import (UserQuit, ask_choice, ask_multi, ask_number, ask_text, ask_yes_no, clean_path, heading)
 from utils_shared.run_logging import start_logging, stop_logging
 from utils_shared.spectral_decomposer import import_fit, decompose_experiment
@@ -97,15 +100,23 @@ def ask_files(last):
 
 
 def ask_trimming(summaries):
-    trims = {}
-    if not ask_yes_no("Do any of the files need trimming at the end (everything after a chosen time is discarded)?", False):
-        return trims
-    for s in summaries:
-        last_event = max([e["time"] for e in s["events"]], default=0.0)
-        value = ask_number(f"  End time for {s['name']} in minutes (recording is {s['duration_min']:.1f} min; Enter = keep it all)",
-                           None, minimum=last_event, allow_blank=True)
-        if value is not None and value < s["duration_min"]:
-            trims[s["name"]] = value
+    """Returns {file name: {"start": minutes or None, "end": minutes or None}}. All times are on the original recording's clock."""
+    trims = {s["name"]: {"start": None, "end": None} for s in summaries}
+    if ask_yes_no("Do any of the files need trimming at the START (everything before a chosen time is discarded, and that time becomes 0)?", False):
+        for s in summaries:
+            first_event = min((e["time"] for e in s["events"]), default=s["duration_min"])
+            value = ask_number(f"  Start time for {s['name']} in minutes (first event is at {first_event:.1f} min; Enter = keep it all)",
+                               None, minimum=0, maximum=first_event, allow_blank=True)
+            if value:
+                trims[s["name"]]["start"] = value
+    if ask_yes_no("Do any of the files need trimming at the END (everything after a chosen time is discarded)?", False):
+        for s in summaries:
+            last_event = max((e["time"] for e in s["events"]), default=0.0)
+            start = trims[s["name"]]["start"] or 0.0
+            value = ask_number(f"  End time for {s['name']} in minutes (recording is {s['duration_min']:.1f} min, last event at {last_event:.1f}; Enter = keep it all)",
+                               None, minimum=max(last_event, start), allow_blank=True)
+            if value is not None and value < s["duration_min"]:
+                trims[s["name"]]["end"] = value
     return trims
 
 
@@ -171,7 +182,7 @@ def ask_experiment_details(summary, answers, export_root):
 
 
 def ask_everything():
-    """Ask all the questions. Returns (answers, folders, per-experiment info, fit)."""
+    """Ask all the questions. Returns (answers, results folder, per-experiment info, fit, comparison pair or None)."""
     last = load_last_answers()
     defaults = dict(settings.DEFAULT_ANSWERS, **last.get("answers", {}))
     answers = dict(defaults)
@@ -186,11 +197,12 @@ def ask_everything():
     text = ask_text("Folder for the results", last.get("export_folder") if last.get("data_folder") == str(folder) else str(folder / "export"))
     export_root = Path(clean_path(text)).expanduser()
 
-    heading("3. Settling time and trimming")
-    answers["ignore_first_minutes"] = ask_number(
-        "How many minutes at the start should be ignored (while things settle)? This is left out when baselines, % ranges and axis limits\n"
-        "are worked out; the data is still plotted and exported", defaults["ignore_first_minutes"], minimum=0)
+    heading("3. Trimming and settling time")
+    print("  (Trim times are the times on the original recording, as the event times listed above are.)")
     trims = ask_trimming(summaries)
+    answers["ignore_first_minutes"] = ask_number(
+        "After trimming, how many minutes at the start should be ignored in calculations (while things settle)? These points are still\n"
+        "plotted and exported, but are left out of baselines (delta A), % ranges and axis limits", defaults["ignore_first_minutes"], minimum=0)
 
     heading("4. Analysis")
     answers["decompose"], answers["fit_file"], fit, answers["decomposition_dataset"] = ask_decomposition(summaries, defaults)
@@ -221,8 +233,17 @@ def ask_everything():
                 ("conc", "Concentration"), ("percent", "% oxidised (lowest to highest = 0 to 100 %)")], defaults["haem_mode"])
             if answers["normalise_od"] and answers["haem_mode"] != "percent":
                 answers["haem_per_od"] = ask_yes_no("  Divide the haem values by OD as well?", defaults["haem_per_od"])
+    comparison = None
     if not (answers["plot_o2"] or answers["plot_ocr"] or answers["plot_haems"]):
         print("  Nothing is set to be plotted, so no figures will be made.")
+    else:
+        answers["event_label_angle"] = ask_number("Angle of the event labels in degrees (0 = horizontal, 90 = vertical)",
+                                                  defaults["event_label_angle"], minimum=0, maximum=90)
+        if len(summaries) >= 2 and ask_yes_no("Also plot a comparison of two runs side by side?", False):
+            names = [(s["name"], s["name"]) for s in summaries]
+            first = ask_choice("  Which run goes on the left?", names)
+            second = ask_choice("  Which run goes on the right?", [n for n in names if n[0] != first])
+            comparison = {"runs": (first, second)}
 
     heading("6. Figure size")
     answers["journal"] = ask_choice("Paper format (journal)", [(k, v) for k, v in JOURNAL_NAMES.items()], defaults["journal"])
@@ -231,6 +252,14 @@ def ask_everything():
     answers["columns"] = ask_choice("Figure width", columns, defaults["columns"] if defaults["columns"] in spec["widths_mm"] else columns[0][0])
     answers["height"] = ask_number(f"Figure height as a fraction of the page height (0.5 = half a page = {0.5 * spec['page_height_mm']:g} mm)",
                                    defaults["height"], minimum=0, exclusive_minimum=True, maximum=1)
+    if comparison:
+        print("\n  The comparison figure has its own size:")
+        wide = [(c, f"{c:g} column{'s' if c != 1 else ''} wide ({mm} mm)") for c, mm in spec["widths_mm"].items()]
+        comparison["columns"] = answers["comparison_columns"] = ask_choice(
+            "Comparison figure width", wide, defaults["comparison_columns"] if defaults["comparison_columns"] in spec["widths_mm"] else wide[-1][0])
+        comparison["height"] = answers["comparison_height"] = ask_number(
+            f"Comparison figure height as a fraction of the page height (0.5 = half a page = {0.5 * spec['page_height_mm']:g} mm)",
+            defaults["comparison_height"], minimum=0, exclusive_minimum=True, maximum=1)
 
     heading("7. Data export")
     print("  Every experiment always gets a workbook with CcO2, CsO2, VoO2, the events and your OD/volume/dilution entries.")
@@ -240,7 +269,8 @@ def ask_everything():
     heading("8. Details for each experiment")
     experiments = []
     for s in summaries:
-        info = {"path": s["path"], "name": s["name"], "trim_end": trims.get(s["name"]), "duration": s["duration_min"]}
+        info = {"path": s["path"], "name": s["name"], "trim_start": trims[s["name"]]["start"], "trim_end": trims[s["name"]]["end"],
+                "duration": s["duration_min"], "keep": bool(comparison) and s["name"] in comparison["runs"]}
         info.update(ask_experiment_details(s, answers, export_root))
         experiments.append(info)
 
@@ -248,13 +278,16 @@ def ask_everything():
     print(f"  Files:            {len(experiments)} from {folder}")
     print(f"  Results to:       {export_root}")
     print(f"  Ignore first:     {answers['ignore_first_minutes']:g} min")
-    print(f"  Trimmed:          {', '.join(f'{k} at {v:g} min' for k, v in trims.items()) or 'none'}")
+    trimmed = [f"{k} {('from %g ' % v['start']) if v['start'] else ''}{('to %g ' % v['end']) if v['end'] else ''}min" for k, v in trims.items() if v["start"] or v["end"]]
+    print(f"  Trimmed:          {', '.join(trimmed) or 'none'}")
     print(f"  Decomposition:    {answers['fit_file'] if answers['decompose'] else 'no'}")
     print(f"  OD scaling:       {'yes' if answers['normalise_od'] else 'no'}")
     print(f"  Event averaging:  {'%g min window, ending %g min before the next addition' % (answers['window_minutes'], answers['gap_minutes']) if answers['averaging'] else 'no'}")
     shown = [name for name, on in (("O2", answers["plot_o2"]), (f"OCR ({answers['ocr_mode']})", answers["plot_ocr"]),
                                    (f"haems {', '.join(answers['haems'])} ({answers['haem_mode']})", answers["plot_haems"])) if on]
     print(f"  Plots:            {'; '.join(shown) or 'none'}")
+    if comparison:
+        print(f"  Comparison:       {comparison['runs'][0]} (a) vs {comparison['runs'][1]} (b), {comparison['columns']:g} column(s), height {comparison['height']:g} of a page")
     print(f"  Figure:           {JOURNAL_NAMES[answers['journal']]}, {answers['columns']:g} column(s), height {answers['height']:g} of a page")
     print(f"  Workbooks:        {'all processed data' if answers['export_full'] else 'CcO2, CsO2, VoO2'}{' + spectra csv' if answers['export_spectra'] else ''}")
     if not ask_yes_no("\nStart?", True):
@@ -262,7 +295,7 @@ def ask_everything():
 
     save_last_answers({"data_folder": str(folder), "export_folder": str(export_root),
                        "answers": {k: v for k, v in answers.items() if k != "haems" or v}})
-    return answers, export_root, experiments, fit
+    return answers, export_root, experiments, fit, comparison
 # %% PROCESSING --------------------------------------------------------------------------------------------------------------------------------------
 
 
@@ -290,9 +323,12 @@ def process_experiment(info, cfg, fit, export_root):
     merge_event_settings(experiment, info.get("events", []))
     print(f"  Read {len(experiment['CcO2'])} points, {len(metadata['events'])} event(s)")
 
-    if info.get("trim_end") is not None:
-        trim_experiment(experiment, info["trim_end"])
-        print(f"  Trimmed: data after {info['trim_end']:g} min discarded")
+    if info.get("trim_start") is not None or info.get("trim_end") is not None:
+        trim_experiment(experiment, start_time=info.get("trim_start"), end_time=info.get("trim_end"))
+        if info.get("trim_start") is not None:
+            print(f"  Trimmed: data before {info['trim_start']:g} min discarded (that point is now time 0)")
+        if info.get("trim_end") is not None:
+            print(f"  Trimmed: data after {info['trim_end']:g} min discarded")
 
     od_available = False
     if a["normalise_od"]:
@@ -366,12 +402,38 @@ def process_experiment(info, cfg, fit, export_root):
                      "processed": datetime.now().strftime("%Y-%m-%d %H:%M")})
     print("  Exporting ...")
     export_individual_experiment(experiment, export_root, full=a["export_full"], spectra=a["export_spectra"])
+
+    if info.get("keep"):                                            # needed again for the comparison figure
+        experiment["raw_spectra"] = {}
+        return {"experiment": experiment, "vo2_source": vo2_source, "haem_source": haem_source if haem_panels else None}
+    return None
 # %% MAIN --------------------------------------------------------------------------------------------------------------------------------------------
+
+
+def make_comparison(comparison, kept, cfg, export_root):
+    """The side-by-side figure of the two chosen runs (skipped, with the reason, if either one failed or they were plotted differently)."""
+    names = comparison["runs"]
+    first, second = (kept.get(name) for name in names)
+    print(f"\nComparison: {names[0]} (a) vs {names[1]} (b)")
+    if not (first and second):
+        print("  Not made: one of the two runs did not finish.")
+        return
+    if (first["vo2_source"], first["haem_source"]) != (second["vo2_source"], second["haem_source"]):
+        print("  Not made: the two runs were plotted with different data (for example only one has an OD entered).")
+        return
+    try:
+        size = figure_size_inches(cfg.SPEC, comparison["columns"], comparison["height"])
+        stem = plot_comparison(first["experiment"], second["experiment"], cfg.plot_config(first["vo2_source"], first["haem_source"]),
+                               export_root, size, cfg.SPEC)
+        print(f"  Saved comparison/{stem} ({size[0] * 25.4:.0f} x {size[1] * 25.4:.0f} mm)")
+    except Exception as exc:
+        print(f"  Not made: {type(exc).__name__}: {exc}")
+        plt.close("all")
 
 
 def main():
     try:
-        answers, export_root, experiments, fit = ask_everything()
+        answers, export_root, experiments, fit, comparison = ask_everything()
     except (UserQuit, KeyboardInterrupt):
         print("\nCancelled. Nothing was changed.")
         return 1
@@ -381,12 +443,15 @@ def main():
     start = time.perf_counter()
     log_session = start_logging(export_root)
     failed = []
+    kept = {}
     try:
         for warning in cfg.STYLE_WARNINGS:
             print(f"Figure style warning: {warning}")
         for info in experiments:
             try:
-                process_experiment(info, cfg, fit, export_root)
+                result = process_experiment(info, cfg, fit, export_root)
+                if result:
+                    kept[info["name"]] = result
             except KeyboardInterrupt:
                 raise
             except Exception as exc:
@@ -396,6 +461,8 @@ def main():
             finally:
                 plt.close("all")
                 gc.collect()
+        if comparison:
+            make_comparison(comparison, kept, cfg, export_root)
         minutes, seconds = divmod(time.perf_counter() - start, 60)
         print(f"\nFinished {len(experiments) - len(failed)} of {len(experiments)} file(s) in {int(minutes)} min {seconds:.0f} s.")
         if failed:
