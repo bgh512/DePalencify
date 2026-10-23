@@ -38,6 +38,8 @@ from utils_shared.paf_reader import PafError, load_experiment_from_paf, read_exp
 from utils_shared.trimming import trim_experiment
 from utils_shared.questions import (UserQuit, ask_choice, ask_multi, ask_number, ask_text, ask_yes_no, clean_path, heading)
 from utils_shared.run_logging import start_logging, stop_logging
+from utils_custom.custom_questions import custom_choice_asker, custom_detail_asker
+from utils_custom.custom_runner import experiment_preparer, haem_ocr_runner, time_response_runner
 from utils_shared.spectral_decomposer import import_fit, decompose_experiment
 
 FITS_FOLDER = HERE / "fits"
@@ -120,14 +122,14 @@ def ask_trimming(summaries):
     return trims
 
 
-def ask_decomposition(summaries, defaults):
-    """Returns (decompose, fit_file, fit, dataset)."""
+def ask_decomposition(summaries, defaults, forced=False):
+    """Returns (decompose, fit_file, fit, dataset). ``forced`` skips the yes/no question (the special figures need the haems)."""
     fits = sorted(FITS_FOLDER.glob("*.csv"), key=lambda p: p.name.lower())
     if not fits:
         print(f"  No fit files (.csv) were found in {FITS_FOLDER}, so haems cannot be decomposed this time.")
         print("  Put a fit .csv in that folder and run again to get haem results.")
         return False, None, None, defaults["decomposition_dataset"]
-    if not ask_yes_no("Decompose the spectra into haems?", defaults["decompose"]):
+    if not forced and not ask_yes_no("Decompose the spectra into haems?", defaults["decompose"]):
         return False, None, None, defaults["decomposition_dataset"]
     names = [p.name for p in fits]
     fit_file = ask_choice("Which fit?", [(n, n) for n in names], defaults.get("fit_file") if defaults.get("fit_file") in names else names[0])
@@ -197,12 +199,12 @@ def ask_everything():
     text = ask_text("Folder for the results", last.get("export_folder") if last.get("data_folder") == str(folder) else str(folder / "export"))
     export_root = Path(clean_path(text)).expanduser()
 
-    heading("3. Trimming and settling time")
+    heading("3. Settling time and trimming")
     print("  (Trim times are the times on the original recording, as the event times listed above are.)")
-    trims = ask_trimming(summaries)
     answers["ignore_first_minutes"] = ask_number(
-        "After trimming, how many minutes at the start should be ignored in calculations (while things settle)? These points are still\n"
-        "plotted and exported, but are left out of baselines (delta A), % ranges and axis limits", defaults["ignore_first_minutes"], minimum=0)
+        "How many minutes at the start should be ignored (while things settle)? This is left out when baselines, % ranges and axis limits\n"
+        "are worked out; the data is still plotted and exported", defaults["ignore_first_minutes"], minimum=0)
+    trims = ask_trimming(summaries)
 
     heading("4. Analysis")
     answers["decompose"], answers["fit_file"], fit, answers["decomposition_dataset"] = ask_decomposition(summaries, defaults)
@@ -245,7 +247,13 @@ def ask_everything():
             second = ask_choice("  Which run goes on the right?", [n for n in names if n[0] != first])
             comparison = {"runs": (first, second)}
 
-    heading("6. Figure size")
+    heading("6. Special figures")
+    wants_time_response, wants_haem_ocr = custom_choice_asker(defaults)
+    if (wants_time_response or wants_haem_ocr) and fit is None:
+        print("  These figures need the haem decomposition, so it is switched on now.")
+        answers["decompose"], answers["fit_file"], fit, answers["decomposition_dataset"] = ask_decomposition(summaries, defaults, forced=True)
+
+    heading("7. Figure size")
     answers["journal"] = ask_choice("Paper format (journal)", [(k, v) for k, v in JOURNAL_NAMES.items()], defaults["journal"])
     spec = settings.JOURNAL_SPECS[answers["journal"]]
     columns = [(c, f"{c:g} column{'s' if c != 1 else ''} wide ({mm} mm)") for c, mm in spec["widths_mm"].items()]
@@ -261,16 +269,26 @@ def ask_everything():
             f"Comparison figure height as a fraction of the page height (0.5 = half a page = {0.5 * spec['page_height_mm']:g} mm)",
             defaults["comparison_height"], minimum=0, exclusive_minimum=True, maximum=1)
 
-    heading("7. Data export")
+    custom = {"time_response": None, "haem_ocr": None}
+    if wants_time_response or wants_haem_ocr:
+        heading("8. Settings of the special figures")
+        custom = custom_detail_asker([s["name"] for s in summaries], answers, defaults, fit, wants_time_response, wants_haem_ocr)
+    else:
+        answers["plot_time_response"] = answers["plot_haem_ocr"] = False
+
+    heading("9. Data export")
     print("  Every experiment always gets a workbook with CcO2, CsO2, VoO2, the events and your OD/volume/dilution entries.")
     answers["export_full"] = ask_yes_no("Also put every processed table in it (OD-scaled, haems, percent, ...)?", defaults["export_full"])
     answers["export_spectra"] = ask_yes_no("Also export the spectra as csv files? (large, and it takes a while)", defaults["export_spectra"])
 
-    heading("8. Details for each experiment")
+    heading("10. Details for each experiment")
     experiments = []
     for s in summaries:
         info = {"path": s["path"], "name": s["name"], "trim_start": trims[s["name"]]["start"], "trim_end": trims[s["name"]]["end"],
-                "duration": s["duration_min"], "keep": bool(comparison) and s["name"] in comparison["runs"]}
+                "duration": s["duration_min"], "keep": bool(comparison) and s["name"] in comparison["runs"],
+                "custom": {"time_response_group": (custom["time_response"] or {}).get(s["name"]),
+                           "haem_ocr": s["name"] in (custom["haem_ocr"] or [])}}
+        info["keep"] = info["keep"] or bool(info["custom"]["time_response_group"]) or info["custom"]["haem_ocr"]
         info.update(ask_experiment_details(s, answers, export_root))
         experiments.append(info)
 
@@ -288,6 +306,10 @@ def ask_everything():
     print(f"  Plots:            {'; '.join(shown) or 'none'}")
     if comparison:
         print(f"  Comparison:       {comparison['runs'][0]} (a) vs {comparison['runs'][1]} (b), {comparison['columns']:g} column(s), height {comparison['height']:g} of a page")
+    if answers["plot_time_response"]:
+        print(f"  Time response:    groups {', '.join(answers['tr_groups'])}, {answers['tr_columns']:g} column(s), height {answers['tr_height']:g} of a page")
+    if answers["plot_haem_ocr"]:
+        print(f"  Haem and OCR:     publication figure + exemplar figure (run {answers['ho_exemplar_run']}), {len(custom['haem_ocr'])} file(s)")
     print(f"  Figure:           {JOURNAL_NAMES[answers['journal']]}, {answers['columns']:g} column(s), height {answers['height']:g} of a page")
     print(f"  Workbooks:        {'all processed data' if answers['export_full'] else 'CcO2, CsO2, VoO2'}{' + spectra csv' if answers['export_spectra'] else ''}")
     if not ask_yes_no("\nStart?", True):
@@ -403,9 +425,15 @@ def process_experiment(info, cfg, fit, export_root):
     print("  Exporting ...")
     export_individual_experiment(experiment, export_root, full=a["export_full"], spectra=a["export_spectra"])
 
-    if info.get("keep"):                                            # needed again for the comparison figure
+    prepared = experiment_preparer(experiment, info["custom"], a, fit, od_available)     # the special figures
+
+    if info.get("keep"):                                            # needed again for the comparison and special figures
         experiment["raw_spectra"] = {}
-        return {"experiment": experiment, "vo2_source": vo2_source, "haem_source": haem_source if haem_panels else None}
+        for item in prepared.values():
+            if item is not None:
+                item["raw_spectra"] = {}
+        return {"experiment": experiment, "vo2_source": vo2_source, "haem_source": haem_source if haem_panels else None,
+                "prepared": prepared}
     return None
 # %% MAIN --------------------------------------------------------------------------------------------------------------------------------------------
 
@@ -429,6 +457,26 @@ def make_comparison(comparison, kept, cfg, export_root):
     except Exception as exc:
         print(f"  Not made: {type(exc).__name__}: {exc}")
         plt.close("all")
+
+
+def make_special_figures(kept, cfg, fit, export_root):
+    """The time response and the haem and OCR response figures (each skipped, with the reason, if it cannot be made)."""
+    a = cfg.answers
+    for key, enabled, title, runner in (("time_response", a["plot_time_response"], "Time response", time_response_runner),
+                                        ("haem_ocr", a["plot_haem_ocr"], "Haem and OCR response", haem_ocr_runner)):
+        if not enabled:
+            continue
+        print(f"\n{title}")
+        prepared = {name: item["prepared"][key] for name, item in kept.items() if item["prepared"].get(key) is not None}
+        if len(prepared) < 2:
+            print(f"  Not made: only {len(prepared)} file(s) could be prepared (at least two are needed).")
+            continue
+        try:
+            runner(prepared, cfg, a, fit, export_root)
+        except Exception as exc:                               # one special figure must not stop the other
+            print(f"  Not made: {type(exc).__name__}: {exc}")
+            print(traceback.format_exc())
+            plt.close("all")
 
 
 def main():
@@ -463,6 +511,7 @@ def main():
                 gc.collect()
         if comparison:
             make_comparison(comparison, kept, cfg, export_root)
+        make_special_figures(kept, cfg, fit, export_root)
         minutes, seconds = divmod(time.perf_counter() - start, 60)
         print(f"\nFinished {len(experiments) - len(failed)} of {len(experiments)} file(s) in {int(minutes)} min {seconds:.0f} s.")
         if failed:

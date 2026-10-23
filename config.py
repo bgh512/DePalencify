@@ -23,6 +23,13 @@ DEFAULT_ANSWERS = {
     "journal": "nature", "columns": 1, "height": 0.5,
     "comparison_columns": 2, "comparison_height": 0.5,       # size of the side-by-side comparison figure
     "export_full": False, "export_spectra": False,
+    # special figures (see utils_custom): time response, and haem and OCR response (publication + exemplar figures)
+    "plot_time_response": False, "plot_haem_ocr": False,
+    "tr_groups": ["knockdown", "control"], "tr_window_minutes": 1.0, "tr_gap_minutes": 0.5, "tr_final_gap_minutes": 0.5,
+    "tr_examples": [], "tr_columns": 2, "tr_height": 0.9,
+    "ho_haem_mode": "delta", "ho_per_od": True, "ho_metric": "delta", "ho_haems": [], "ho_ocr_mode": "od",
+    "ho_window_minutes": 2.0, "ho_gap_minutes": 0.5, "ho_final_gap_minutes": 0.5, "ho_exemplar_run": 1,
+    "ho_pub_columns": 2, "ho_pub_height": 1.0, "ho_ex_columns": 1.5, "ho_ex_height": 0.7,
 }
 
 TRANSMISSION_MODE = "fraction"          # "fraction", "percentage" or "absorbance"

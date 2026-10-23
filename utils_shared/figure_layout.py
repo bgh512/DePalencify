@@ -151,7 +151,19 @@ def fit_figure_to_canvas(fig, pad_pt, suptitle=None, suptitle_gap_pt=0.0, iterat
 # %% PANEL LETTERS -----------------------------------------------------------------------------------------------------------------------------------
 
 
-def add_panel_letters(fig, panels, font_pt, case="upper", weight="bold", gap_pt=0.0):
+def _free_top(members, left_px, right_px, renderer):
+    """Highest edge (pixels) of anything the panel draws between ``left_px`` and ``right_px`` horizontally."""
+    boxes = []
+    for ax in members:
+        boxes += [ax.get_window_extent(renderer), ax.xaxis.get_tightbbox(renderer), ax.yaxis.get_tightbbox(renderer)]
+        if ax.get_title():
+            boxes.append(ax.title.get_window_extent(renderer))
+        boxes += [text.get_window_extent(renderer) for text in ax.texts if text.get_text()]
+    tops = [b.y1 for b in boxes if b is not None and b.x1 >= left_px and b.x0 <= right_px]
+    return max(tops) if tops else None
+
+
+def add_panel_letters(fig, panels, font_pt, case="upper", weight="bold", gap_pt=0.0, fit_to_corner=False):
     """
     Write each panel's letter at the top-left corner of everything that panel draws (labels, ticks, titles)
 
@@ -160,6 +172,10 @@ def add_panel_letters(fig, panels, font_pt, case="upper", weight="bold", gap_pt=
              ``(text, text keyword arguments)``: a small note written on the same line, just after the letter (used for
              faint run-name watermarks, so it takes no extra height). Call fit_figure_to_canvas again afterwards so the
              letters are inside the margins.
+
+    fit_to_corner : False puts each letter above everything its panel draws (the usual place). True puts it just above the
+                    first thing that actually lies in its own corner, so a letter is not pushed up by tall labels elsewhere
+                    in the panel (such as rotated event labels that start further right).
     """
     if case not in ("upper", "lower"):
         raise ValueError('The panel letter case must be "upper" or "lower".')
@@ -172,6 +188,10 @@ def add_panel_letters(fig, panels, font_pt, case="upper", weight="bold", gap_pt=
         main_box = main.get_window_extent(renderer)
         left = min(b.x0 for b in boxes)
         top = max(b.y1 for b in boxes)
+        if fit_to_corner:
+            span = 1.2 * font_pt * fig.dpi / 72.0                      # about the width of one letter
+            local = _free_top(members, left, left + span, renderer)
+            top = max(local if local is not None else main_box.y1, main_box.y1)
         rows.append((letter, main, (main_box.x0 - left) * scale, (top - main_box.y1) * scale, round(main_box.x0 / 2.0),
                      extra[0] if extra else None))
 

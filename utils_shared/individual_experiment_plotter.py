@@ -21,12 +21,12 @@ def _first_series(df):
     return get_times(df), get_values(df, column)
 
 
-def _legend(ax, config, text_only=False):
+def _legend(ax, config, text_only=False, location=None):
     """
     Legend with an optional thin box. ``text_only`` drops the coloured line beside each entry (used for the haem panels,
     where the colour already identifies the trace and the word names it).
     """
-    options = {"loc": config["LEGEND_LOCATION"], "ncol": config["LEGEND_COLUMNS"],
+    options = {"loc": location or config["LEGEND_LOCATION"], "ncol": config["LEGEND_COLUMNS"],
                "frameon": config["LEGEND_FRAME"], "fontsize": config["LEGEND_FONT_SIZE"]}
     if text_only:
         options.update(handlelength=0, handletextpad=0)
@@ -249,7 +249,8 @@ def draw_experiment(fig, subplot_spec, experiment, config):
         if config["SHOW_LEGENDS"].get(panel["type"], True):
             # A haem panel's legend is just the word when it holds a single trace (HAEM_LEGEND_TEXT_ONLY).
             _legend(ax, config, text_only=(panel["type"] == "haem" and len(panel["haems"]) == 1
-                                           and config.get("HAEM_LEGEND_TEXT_ONLY", False)))
+                                           and config.get("HAEM_LEGEND_TEXT_ONLY", False)),
+                    location=config.get("LEGEND_LOCATIONS", {}).get(panel["type"]))
 
     # Format axes; x limits default to the span of the plotted data. Only the lowest axis shows x tick labels.
     for ax in axes:
