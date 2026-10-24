@@ -12,7 +12,7 @@ __pycache__/
 .shortcut_made
 
 # Private or local data
-fiazall_data/
+*_data/
 last_answers.json
 export/
 *.paf

@@ -139,7 +139,8 @@ def read_saved_settings(output_dir, experiment_name):
     for _, row in sheets.get("Events", pd.DataFrame()).iterrows():
         concentration = row.get("concentration_uM")
         events.append({"datapoint": int(row["datapoint"]), "label": "" if pd.isna(row.get("label")) else str(row["label"]),
-                       "concentration_uM": None if pd.isna(concentration) else float(concentration)})
+                       "concentration_uM": None if pd.isna(concentration) else float(concentration),
+                       "ignored": bool(row.get("ignored", False)) if pd.notna(row.get("ignored", False)) else False})
     saved["events"] = events
     return saved if any(k in saved for k in SETTINGS_KEYS) or events else None
 # %% EXPORT ------------------------------------------------------------------------------------------------------------------------------------------
@@ -215,7 +216,8 @@ def export_individual_experiment(experiment, output_dir, full=False, spectra=Fal
         metadata = experiment.get("metadata") if isinstance(experiment.get("metadata"), dict) else {}
 
         # 4. Events, with the label and concentration the user entered.
-        events = metadata.get("events", [])
+        events = sorted(list(metadata.get("events", [])) + list(metadata.get("ignored_events", [])),
+                        key=lambda e: e.get("time") if e.get("time") is not None else 0)
         if True:                                   # always written, so the sheet exists even for a file with no events
             write_frame(pd.DataFrame({
                 "event": [f"Event {i}" for i in range(1, len(events) + 1)],
@@ -223,10 +225,11 @@ def export_individual_experiment(experiment, output_dir, full=False, spectra=Fal
                 "time_min": [e.get("time") for e in events],
                 "paf_text": [e.get("text", "") for e in events],
                 "label": [e.get("label", "") for e in events],
-                "concentration_uM": [e.get("concentration_uM") for e in events]}), "Events", first_col_width=12)
+                "concentration_uM": [e.get("concentration_uM") for e in events],
+                "ignored": [bool(e.get("ignored", False)) for e in events]}), "Events", first_col_width=12)
 
         # 5. Metadata (OD, volume, dilution factor, settings used, notes, acquisition details).
-        fields = [(k, v) for k, v in metadata.items() if k not in ("events", "binary_metadata")]
+        fields = [(k, v) for k, v in metadata.items() if k not in ("events", "ignored_events", "binary_metadata")]
         frame = pd.DataFrame({
             "Field": [k for k, _ in fields],
             "Value": [json.dumps(v, default=str) if isinstance(v, (dict, list, tuple)) else v for _, v in fields],

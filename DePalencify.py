@@ -169,16 +169,31 @@ def ask_experiment_details(summary, answers, export_root):
         for number, event in enumerate(summary["events"], start=1):
             old = saved_events.get(event["datapoint"], {})
             events.append({"datapoint": event["datapoint"], "label": old.get("label") or event["text"],
-                           "concentration_uM": old.get("concentration_uM")})
+                           "concentration_uM": old.get("concentration_uM"), "ignored": bool(old.get("ignored", False))})
         print("    Events in the file:")
         for number, (event, entry) in enumerate(zip(summary["events"], events), start=1):
             conc = "" if entry["concentration_uM"] is None else f"{entry['concentration_uM']:g} uM "
-            print(f"      {number}) {event['time']:.2f} min   {conc}{entry['label']}")
+            note = "   [IGNORED]" if entry["ignored"] else ""
+            print(f"      {number}) {event['time']:.2f} min   {conc}{entry['label']}{note}")
         if ask_yes_no("    Change any labels or concentrations?", False):
             for number, (event, entry) in enumerate(zip(summary["events"], events), start=1):
                 entry["label"] = ask_text(f"      Event {number} ({event['time']:.2f} min) label", entry["label"]) or entry["label"]
                 entry["concentration_uM"] = ask_number(f"      Event {number} concentration in uM (Enter = unknown)",
                                                        entry["concentration_uM"], minimum=0, allow_blank=True)
+        # Events that were not additions (for example a dilution) are ignored everywhere.
+        # A label of "ignore" does the same, so it can also be set while changing labels.
+        for entry in events:
+            if entry["label"].strip().lower() == "ignore":
+                entry["ignored"] = True
+        current = [str(n) for n, entry in enumerate(events, start=1) if entry["ignored"]]
+        text = ask_text("    Ignore any of these events (not an addition, e.g. a dilution)? "
+                        "Numbers separated by commas, '-' for none", ",".join(current) or "-")
+        chosen = set()
+        for part in text.replace(" ", "").split(","):
+            if part.isdigit() and 1 <= int(part) <= len(events):
+                chosen.add(int(part))
+        for number, entry in enumerate(events, start=1):
+            entry["ignored"] = number in chosen
     details["events"] = events
     return details
 
@@ -329,6 +344,13 @@ def merge_event_settings(experiment, events):
         if item:
             event["label"] = item["label"] or event["text"]
             event["concentration_uM"] = item["concentration_uM"]
+            event["ignored"] = bool(item.get("ignored", False))
+    # Ignored events leave the working list (so nothing plots or averages them) but are
+    # kept in metadata["ignored_events"] so the workbook still records them.
+    metadata = experiment["metadata"]
+    events = metadata.get("events", [])
+    metadata["ignored_events"] = [e for e in events if e.get("ignored")]
+    metadata["events"] = [e for e in events if not e.get("ignored")]
 
 
 def process_experiment(info, cfg, fit, export_root):
@@ -343,7 +365,9 @@ def process_experiment(info, cfg, fit, export_root):
         if info.get(key) is not None:
             metadata[key] = info[key]
     merge_event_settings(experiment, info.get("events", []))
-    print(f"  Read {len(experiment['CcO2'])} points, {len(metadata['events'])} event(s)")
+    skipped = len(metadata.get("ignored_events", []))
+    print(f"  Read {len(experiment['CcO2'])} points, {len(metadata['events'])} event(s)"
+          + (f" ({skipped} ignored)" if skipped else ""))
 
     if info.get("trim_start") is not None or info.get("trim_end") is not None:
         trim_experiment(experiment, start_time=info.get("trim_start"), end_time=info.get("trim_end"))
