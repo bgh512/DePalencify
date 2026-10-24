@@ -368,7 +368,7 @@ def exemplar_runner(chosen: dict,
     first = next(iter(chosen.values()))
     shown = []
     if fit is not None and answers['plot_haems']:
-        shown = [h for h in fit['haem_list'] if h in answers['haems']]
+        shown = [h for h in answers['haems'] if h in fit['haem_list']]
     haem_source = first['haem_source'] if shown else None
     figure_answers = dict(answers, journal=cfg.answers['journal'])
     individual = individual_config_builder(figure_answers,

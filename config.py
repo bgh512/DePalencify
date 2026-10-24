@@ -234,7 +234,7 @@ class Config:
             "VO2_LABEL": "VO2",
             "VO2_COLOUR": None,
             "VO2_PLOT_VALUES": vo2_source,
-            "VO2_AXIS_LABELS": {"raw": "OCR (µM $^{-1}$)", "od": "OCR (µM\nmin$^{-1}$ OD$^{-1}$)", "percent": "OCR (% of range)"},
+            "VO2_AXIS_LABELS": {"raw": "OCR (µM min$^{-1}$)", "od": "OCR (µM\nmin$^{-1}$ OD$^{-1}$)", "percent": "OCR (% of range)"},
             "VO2_Y_MIN": 0,
             "VO2_Y_MAX": None,
             "VO2_Y_NUM_TICKS": None,

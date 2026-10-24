@@ -2,6 +2,8 @@
 from pathlib import Path
 from typing import Callable, Dict, List, Optional, Tuple
 
+import re
+
 import config as settings
 from utils_custom.run_namer import run_name_lister
 from utils_shared.individual_experiment_exporter import read_saved_settings
@@ -9,12 +11,16 @@ from utils_shared.paf_reader import PafError, read_experiment_summary
 from utils_shared.questions import (ask_choice,
                                     ask_multi,
                                     ask_number,
+                                    ask_numbers,
                                     ask_text,
                                     ask_yes_no,
                                     clean_path,
                                     info,
                                     italic,
                                     numbering_restarter,
+                                    numbering_setter,
+                                    progress_clearer,
+                                    progress_printer,
                                     )
 from utils_shared.spectral_decomposer import import_fit
 
@@ -23,10 +29,117 @@ JOURNAL_NAMES = {'nature': 'Nature',
                  'cell': 'Cell',
                  'pnas': 'PNAS',
                  }
-OCR_LABELS = {'raw': 'Raw OCR',
-              'od': 'OCR per OD (OCR/OD)',
-              'percent': 'OCR as a % of its range (lowest to highest)',
+OCR_LABELS = {'raw': 'OCR (µM min⁻¹)',
+              'od': 'OCR / OD (µM min⁻¹ OD⁻¹)',
+              'percent': 'OCR (% of the range)',
               }
+SUBSCRIPTS = {'0': '₀', '1': '₁', '2': '₂', '3': '₃', '4': '₄', '5': '₅',
+              '6': '₆', '7': '₇', '8': '₈', '9': '₉', 'a': 'ₐ', 'e': 'ₑ',
+              'h': 'ₕ', 'i': 'ᵢ', 'j': 'ⱼ', 'k': 'ₖ', 'l': 'ₗ', 'm': 'ₘ',
+              'n': 'ₙ', 'o': 'ₒ', 'p': 'ₚ', 'r': 'ᵣ', 's': 'ₛ', 't': 'ₜ',
+              'u': 'ᵤ', 'v': 'ᵥ', 'x': 'ₓ',
+              }
+
+
+# ---- HAEM NAME FORMATTER -------------------------------------------------------------
+
+def haem_name_formatter(name: str) -> str:
+    """
+    ---- Summary ----
+    Main function to write a haem name for the terminal: the $...$ maths markers are
+    removed, subscripts become subscript characters where they exist, and the maths
+    part is shown in italics, e.g. 'Cyt $b_H$' becomes 'Cyt bₕ'.
+
+    ---- Inputs ----
+    name : str
+        Haem name as written in the fit file.
+
+    ---- Globals read ----
+    SUBSCRIPTS (module constant).
+
+    ---- Outputs ----
+    str
+        Name for display only; the original name is still used everywhere else.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    None.
+    """
+
+    def _subscript_converter(match: 're.Match') -> str:
+        text = match.group(1) if match.group(1) is not None else match.group(2)
+        if all(c.lower() in SUBSCRIPTS for c in text):
+            return ''.join(SUBSCRIPTS[c.lower()] for c in text)
+        return '_' + text
+
+    def _maths_converter(match: 're.Match') -> str:
+        inner = re.sub(r'_\{([^}]*)\}|_(.)', _subscript_converter, match.group(1))
+        return italic(inner.replace('\\', ''))
+
+    return re.sub(r'\$([^$]*)\$', _maths_converter, str(name))
+
+
+# ---- OPTION BUILDERS -----------------------------------------------------------------
+
+def ocr_options(keys: List[str]) -> List[Tuple[str, str]]:
+    """
+    ---- Summary ----
+    Helper function to build the (key, label) choices for the OCR questions, using
+    the units of the plot axes.
+
+    ---- Inputs ----
+    keys : List[str]
+        OCR kinds offered: 'raw', 'od' and/or 'percent'.
+
+    ---- Globals read ----
+    OCR_LABELS (module constant).
+
+    ---- Outputs ----
+    List[Tuple[str, str]]
+        [(key, label), ...] in the order of ``keys``.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    None.
+    """
+    return [(key, OCR_LABELS[key]) for key in keys]
+
+
+def haem_form_options(include_percent: bool) -> List[Tuple[str, str]]:
+    """
+    ---- Summary ----
+    Helper function to build the (key, label) choices for the 'how to show the
+    haems' questions. The delta A line explains itself in italics.
+
+    ---- Inputs ----
+    include_percent : bool
+        True to offer the % oxidised choice.
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    List[Tuple[str, str]]
+        [(key, label), ...]: abs, delta, conc and optionally percent.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    None.
+    """
+    delta = f"ΔA (mOD), {italic('the change in absorbance from the start')}"
+    options = [('abs', 'Absorbance (mOD)'),
+               ('delta', delta),
+               ('conc', 'Concentration'),
+               ]
+    if include_percent:
+        options.append(('percent', '% oxidised (lowest to highest = 0 to 100 %)'))
+    return options
 
 
 # ---- COLUMNS TEXT --------------------------------------------------------------------
@@ -134,14 +247,17 @@ def files_asker(last: dict) -> Tuple[Path, List[dict], Path]:
 
     # ---- 2 Read every file ----------------------------------------------------
     summaries = []
-    for path in files:
+    for number, path in enumerate(files, start=1):
+        progress_printer(f'Reading file {number} of {len(files)}: {path.name} ...')
         try:
             summary = read_experiment_summary(path)
         except PafError as exc:
+            progress_clearer()
             info(f'Skipping {path.name}: {exc}')
             continue
         summary['path'] = path
         summaries.append(summary)
+    progress_clearer()
     if not summaries:
         raise SystemExit('None of the .paf files could be read.')
     info(f'\nFound {len(summaries)} readable file(s):')
@@ -295,9 +411,6 @@ def trim_asker(summaries: List[dict], remembered: dict) -> Dict[str, dict]:
     info('TRIM: data that will not be imported, plotted or used.')
     info('IGNORE: data that will be imported and plotted, but not used for '
          'calculations (baselines, % ranges, axis limits).',
-         )
-    info('Trim times are the times on the original recording, like the event times. '
-         'Ignore times count from the new 0 (after trimming).',
          )
     collected = {s['name']: {} for s in summaries}
 
@@ -548,22 +661,23 @@ def od_asker(summaries: List[dict], saved: dict) -> Dict[str, dict]:
     for summary in summaries:
         name = summary['name']
         old = saved.get(name) or {}
-        info(f'\n{name}:', depth=2)
+        info(f'\n{name}:', depth=2, tight=True)
         numbering_restarter(2)
-        values[name] = {'OD': ask_number(f'What is the OD of {name}?',
+        values[name] = {'OD': ask_number('What was the OD of the cells added?',
                                          old.get('OD'),
                                          minimum=0,
                                          exclusive_minimum=True,
                                          depth=2,
                                          ),
-                        'volume': ask_number(f'What is the volume of {name}?',
+                        'volume': ask_number('What volume of cells (mL) were spun down '
+                                             'and resuspended in 5 mL?',
                                              old.get('volume'),
                                              minimum=0,
                                              exclusive_minimum=True,
                                              depth=2,
                                              ),
-                        'dilution_factor': ask_number('What is the dilution factor '
-                                                      f'of {name}?',
+                        'dilution_factor': ask_number('What is the dilution factor, if '
+                                                      'the cells were diluted mid run?',
                                                       old.get('dilution_factor', 1.0),
                                                       minimum=0,
                                                       exclusive_minimum=True,
@@ -622,31 +736,31 @@ def event_asker(summaries: List[dict], saved: dict) -> Dict[str, List[dict]]:
     if not with_events:
         return result
 
-    # ---- 2 Ask about each file --------------------------------------------------
+    # ---- 2 Show the current events and ask which runs to change ------------------
+    info('Current runs and event labels are:')
+    for number, summary in enumerate(with_events, start=1):
+        info(f"{number}) {summary['name']}:")
+        for event, entry in zip(summary['events'], result[summary['name']]):
+            info(_event_line_builder(event, entry), depth=2)
     if not ask_yes_no('Do you want to change any event labels?', False):
         return result
-    for summary in with_events:
+    chosen = ask_numbers('Which run(s) do you want to change?',
+                         len(with_events),
+                         depth=2,
+                         )
+
+    # ---- 3 Ask about the events of each chosen run -------------------------------
+    for number in chosen:
+        summary = with_events[number - 1]
         name = summary['name']
         events = result[name]
         info(f'\n{name}:', depth=2)
         for event, entry in zip(summary['events'], events):
-            conc = ('' if entry['concentration_uM'] is None
-                    else f"{entry['concentration_uM']:g} uM ")
-            note = '  [IGNORED]' if entry['ignored'] else ''
-            info(f"  {event['time']:.2f} min   {conc}{entry['label']}{note}",
-                 depth=2,
-                 )
-        if not ask_yes_no(f'Do you want to change the events of {name}?',
-                          False,
-                          depth=2,
-                          ):
-            continue
-        for number, (event, entry) in enumerate(zip(summary['events'], events),
-                                                start=1,
-                                                ):
-            numbering_restarter(3)
-            label = ask_text(f"What was added at event {number} ({event['time']:.2f} "
-                             "min)? Write 'ignore' to ignore this event.",
+            info(_event_line_builder(event, entry), depth=2)
+        numbering_setter(2, number)
+        for event, entry in zip(summary['events'], events):
+            label = ask_text(f"What was added at {event['time']:.2f} min? "
+                             "Write 'ignore' to ignore this event.",
                              entry['label'],
                              depth=3,
                              )
@@ -663,6 +777,39 @@ def event_asker(summaries: List[dict], saved: dict) -> Dict[str, List[dict]]:
                                                    blank_label='unknown',
                                                    )
     return result
+
+
+# ---- EVENT LINE BUILDER --------------------------------------------------------------
+
+def _event_line_builder(event: dict, entry: dict) -> str:
+    """
+    ---- Summary ----
+    Helper function to write one event as 'label, time' for the event listings.
+
+    ---- Inputs ----
+    event : dict
+        Event from the file summary (time in minutes).
+    entry : dict
+        Current label, concentration_uM and ignored flag of that event.
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    str
+        For example '  nd-011992, 15.01 min' or with the concentration and
+        '[IGNORED]' when they apply.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    None.
+    """
+    conc = ('' if entry['concentration_uM'] is None
+            else f", {entry['concentration_uM']:g} uM")
+    note = '  [IGNORED]' if entry['ignored'] else ''
+    return f"  {entry['label']}, {event['time']:.2f} min{conc}{note}"
 
 
 # ---- ANALYSIS ASKER ------------------------------------------------------------------
@@ -713,9 +860,13 @@ def analysis_asker(summaries: List[dict],
      ) = decomposition_asker(summaries, defaults, fits_folder)
 
     # ---- 2 OD scaling ------------------------------------------------------------
-    saved = {s['name']: read_saved_settings(export_root, s['name'])
-             for s in summaries
-             }
+    saved = {}
+    for number, summary in enumerate(summaries, start=1):
+        progress_printer(f'Looking for earlier values, file {number} of '
+                         f'{len(summaries)} ...',
+                         )
+        saved[summary['name']] = read_saved_settings(export_root, summary['name'])
+    progress_clearer()
     if any(saved.values()):
         info("\nEarlier OD and event values found in the experiments' workbooks are "
              'offered as defaults.',
@@ -863,7 +1014,7 @@ def plot_asker(answers: dict, defaults: dict, fit: Optional[dict]) -> bool:
     if answers['plot_ocr']:
         keys = ['raw'] + (['od'] if answers['normalise_od'] else []) + ['percent']
         answers['ocr_mode'] = ask_choice('Which OCR would you like to plot?',
-                                         [(k, OCR_LABELS[k]) for k in keys],
+                                         ocr_options(keys),
                                          defaults['ocr_mode'] if defaults['ocr_mode']
                                          in keys else keys[0],
                                          depth=2,
@@ -882,15 +1033,11 @@ def plot_asker(answers: dict, defaults: dict, fit: Optional[dict]) -> bool:
                                      default_all=True,
                                      keep_order=True,
                                      depth=2,
+                                     default_values=defaults['haems'],
+                                     label_formatter=haem_name_formatter,
                                      )
-        delta = f"ΔA (mOD), {italic('the change in absorbance from the start')}"
         answers['haem_mode'] = ask_choice('How would you like to plot the haems?',
-                                          [('abs', 'Absorbance (mOD)'),
-                                           ('delta', delta),
-                                           ('conc', 'Concentration'),
-                                           ('percent', '% oxidised (lowest to '
-                                                       'highest = 0 to 100 %)'),
-                                           ],
+                                          haem_form_options(True),
                                           defaults['haem_mode'],
                                           depth=2,
                                           )

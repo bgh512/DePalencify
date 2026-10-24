@@ -106,15 +106,20 @@ Generated from the source. Names starting with `_` are private helpers.
 - `italic`: ``text`` in italics when the terminal supports it, otherwise in plain brackets-free text.
 - `section_starter`: Start the next numbered section and print its heading.
 - `numbering_restarter`: Make the next question at ``depth`` (and deeper) start again from 1.
+- `numbering_setter`: Make ``value`` the current number at ``depth`` (deeper levels restart), e.g. 3 gives 3.4.3.1 next.
 - `_number_builder`: The next question number at ``depth`` (1 = 3.1, 2 = 3.1.1, ...).
 - `_question_printer`: Print the numbered question line; returns the indent used for the answer prompt.
+- `input_flusher`: Throw away keys pressed while the program was busy, so a stray Enter cannot answer a question.
+- `progress_printer`: Show a one-line progress message that is overwritten by the next one (no new line).
+- `progress_clearer`: Remove the progress line.
 - `_read`: Show the answer prompt and return what was typed (``text`` is the question, for tests).
 - `info`: Print an information line (not a question), indented to sit under the question above.
 - `ask_text`: A line of text; Enter gives ``default``. The default is shown as [default]
 - `ask_yes_no`: y or n; Enter gives ``default`` (the capital letter in the hint).
 - `ask_number`: A number; with ``allow_blank`` an empty answer (when there is no default) gives None.
 - `ask_choice`: ``options`` is a list of (key, label). The user types the number; returns the key. ``default`` is a key.
-- `ask_multi`: Several of ``options``: numbers separated by commas (Enter = all). With ``keep_order`` the typed order is kept.
+- `ask_multi`: Several of ``options``: numbers separated by commas.
+- `ask_numbers`: Numbers from 1 to ``count`` separated by commas; Enter gives an empty list (none).
 - `clean_path`: A path typed or dragged into the window: drop surrounding quotes and spaces.
 - `heading`: A plain heading (used for the summary).
 
@@ -143,6 +148,9 @@ Generated from the source. Names starting with `_` are private helpers.
 
 ## utils_shared/survey.py
 
+- `haem_name_formatter`: Main function to write a haem name for the terminal: the $...$ maths markers are removed, subscripts become subscript characters where they exist, and the maths part is shown in italics, e.g. 'Cyt $b_H$' becomes 'Cyt bₕ'.
+- `ocr_options`: Helper function to build the (key, label) choices for the OCR questions, using the units of the plot axes.
+- `haem_form_options`: Helper function to build the (key, label) choices for the 'how to show the haems' questions. The delta A line explains itself in italics.
 - `_columns_text`: Helper function to write a figure width in columns, e.g. '1 column' or '1.5 columns'.
 - `paf_finder`: Helper function to list the .paf files directly inside a folder, by name.
 - `files_asker`: Main function to ask for the folder of .paf files (1.1) and the results folder (1.2), and to read a summary of every file.
@@ -152,6 +160,7 @@ Generated from the source. Names starting with `_` are private helpers.
 - `averaging_asker`: Main function to ask whether to average around the events, and the window settings.
 - `od_asker`: Main function to ask the OD, volume and dilution factor of every file, offering the values saved in each experiment's workbook.
 - `event_asker`: Main function to ask whether to change the event labels, concentrations and which events to ignore, file by file.
+- `_event_line_builder`: Helper function to write one event as 'label, time' for the event listings.
 - `analysis_asker`: Main function to ask section 3: haem decomposition, OD scaling, event averaging and the event labels.
 - `size_asker`: Main function to ask the journal, width and height of one figure. Answering None to the journal question uses Nature with the fallback width and height.
 - `plot_asker`: Main function to ask section 4: what the individual experiment figures show and how they are sized.

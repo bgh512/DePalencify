@@ -10,7 +10,13 @@ from utils_shared.questions import (ask_choice,
                                     ask_yes_no,
                                     info,
                                     )
-from utils_shared.survey import averaging_asker, decomposition_asker, size_asker
+from utils_shared.survey import (averaging_asker,
+                                  decomposition_asker,
+                                  haem_form_options,
+                                  haem_name_formatter,
+                                  ocr_options,
+                                  size_asker,
+                                  )
 
 
 # ---- WINDOW ENSURER ------------------------------------------------------------------
@@ -198,10 +204,16 @@ def _haem_ocr_asker(names: List[str],
              depth=2,
              )
         return None
-    conditions = {(r['strain'], r['order']) for r in usable}
-    info(f'{len(usable)} file(s) in {len(conditions)} condition(s) will be used.',
-         depth=2,
-         )
+    sets = {}
+    for row in usable:
+        sets.setdefault((row['strain'], row['order']), []).append(row['run'])
+    info(f'{len(usable)} file(s) found in {len(sets)} set(s):', depth=2)
+    for (strain, order), runs in sets.items():
+        runs_text = ', '.join(str(r) for r in sorted(runs))
+        info(f'  {len(runs)} replicate(s) of strain: {strain}, additions: {order} '
+             f'(run {runs_text})',
+             depth=2,
+             )
     if left_out:
         info(f'Left out (name not recognised): {", ".join(left_out)}', depth=2)
 
@@ -210,17 +222,12 @@ def _haem_ocr_asker(names: List[str],
     answers['ho_per_od'] = False
     if answers['normalise_od']:
         answers['ho_ocr_mode'] = ask_choice('Which OCR would you like to use?',
-                                            [('od', 'OCR per OD (OCR/OD)'),
-                                             ('raw', 'Raw OCR'),
-                                             ],
+                                            ocr_options(['raw', 'od']),
                                             defaults['ho_ocr_mode'],
                                             depth=2,
                                             )
     answers['ho_haem_mode'] = ask_choice('How would you like to show the haems?',
-                                         [('abs', 'Absorbance (mOD)'),
-                                          ('delta', 'ΔA (mOD)'),
-                                          ('conc', 'Concentration'),
-                                          ],
+                                         haem_form_options(False),
                                          defaults['ho_haem_mode'],
                                          depth=2,
                                          )
@@ -231,10 +238,14 @@ def _haem_ocr_asker(names: List[str],
                                           depth=2,
                                           )
     answers['ho_metric'] = 'delta'
-    answers['ho_haems'] = ask_multi('Which haems should get a row?',
+    answers['ho_haems'] = ask_multi('Which haems should get a row, and in which '
+                                    'order?',
                                     list(fit['haem_list']),
                                     default_all=True,
+                                    keep_order=True,
                                     depth=2,
+                                    default_values=defaults['ho_haems'],
+                                    label_formatter=haem_name_formatter,
                                     )
 
     # ---- 3 Figure size -----------------------------------------------------------

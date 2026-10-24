@@ -18,6 +18,7 @@ MAX_DEPTH = 6
 
 _counters = [0] * MAX_DEPTH         # [section, question, sub question, ...]
 _colour_ready = False
+_tight_next = False                 # True: the next question follows its heading line directly
 
 
 class UserQuit(Exception):
@@ -65,6 +66,13 @@ def numbering_restarter(depth: int) -> None:
         _counters[level] = 0
 
 
+def numbering_setter(depth: int, value: int) -> None:
+    """Make ``value`` the current number at ``depth`` (deeper levels restart), e.g. 3 gives 3.4.3.1 next."""
+    _counters[depth] = value
+    for level in range(depth + 1, MAX_DEPTH):
+        _counters[level] = 0
+
+
 def _number_builder(depth: int) -> str:
     """The next question number at ``depth`` (1 = 3.1, 2 = 3.1.1, ...)."""
     _counters[depth] += 1
@@ -75,25 +83,57 @@ def _number_builder(depth: int) -> str:
 
 def _question_printer(question: str, depth: int, hint: str = '') -> str:
     """Print the numbered question line; returns the indent used for the answer prompt."""
+    global _tight_next
     indent = INDENT * (depth - 1)
     line = f'{_number_builder(depth)} {question}'
     if hint:
         line += f' {hint}'
-    print(f'\n{indent}{coloured(line)}')
+    print(f"{'' if _tight_next else chr(10)}{indent}{coloured(line)}")
+    _tight_next = False
     return indent
+
+
+def input_flusher() -> None:
+    """Throw away keys pressed while the program was busy, so a stray Enter cannot answer a question."""
+    try:
+        if os.name == 'nt':
+            import msvcrt
+            while msvcrt.kbhit():
+                msvcrt.getwch()
+        else:
+            import termios
+            termios.tcflush(sys.stdin, termios.TCIFLUSH)
+    except Exception:                  # not a real terminal (a pipe, a test): nothing to flush
+        pass
+
+
+def progress_printer(text: str) -> None:
+    """Show a one-line progress message that is overwritten by the next one (no new line)."""
+    print(f'\r{text}'.ljust(100), end='', flush=True)
+
+
+def progress_clearer() -> None:
+    """Remove the progress line."""
+    print('\r' + ' ' * 100 + '\r', end='', flush=True)
 
 
 def _read(text: str, indent: str = '') -> str:
     """Show the answer prompt and return what was typed (``text`` is the question, for tests)."""
+    input_flusher()
     try:
         return input(f'{indent}> ').strip()
     except EOFError:
         raise UserQuit()
 
 
-def info(text: str, depth: int = 1) -> None:
-    """Print an information line (not a question), indented to sit under the question above."""
+def info(text: str, depth: int = 1, tight: bool = False) -> None:
+    """Print an information line (not a question), indented to sit under the question above.
+
+    With ``tight`` the next question follows it without a blank line.
+    """
+    global _tight_next
     print(f'{INDENT * (depth - 1)}{text}')
+    _tight_next = tight
 
 
 # ---- QUESTIONS ----
@@ -184,21 +224,50 @@ def ask_multi(question: str,
               default_all: bool = True,
               keep_order: bool = False,
               depth: int = 1,
+              default_values: Optional[Sequence[str]] = None,
+              label_formatter: Optional[Callable[[str], str]] = None,
               ) -> List[str]:
-    """Several of ``options``: numbers separated by commas (Enter = all). With ``keep_order`` the typed order is kept."""
-    indent = _question_printer(question, depth, '(numbers separated by commas, Enter = all):' if default_all
-                               else '(numbers separated by commas):')
+    """Several of ``options``: numbers separated by commas.
+
+    Enter gives ``default_values`` (the choice from last time, in its order) when there
+    are any, otherwise all of them. With ``keep_order`` the typed order is kept.
+    ``label_formatter`` changes how an option is shown, not what is returned.
+    """
+    remembered = [v for v in (default_values or []) if v in options]
+    fallback = remembered or (list(options) if default_all else [])
+    if remembered:
+        numbers_text = ','.join(str(options.index(v) + 1) for v in remembered)
+        hint = f'(numbers separated by commas, Enter = {numbers_text}):'
+    else:
+        hint = ('(numbers separated by commas, Enter = all):' if default_all
+                else '(numbers separated by commas):')
+    indent = _question_printer(question, depth, hint)
     for number, label in enumerate(options, start=1):
-        print(f'{indent}{INDENT}{number}) {label}')
+        shown = label_formatter(label) if label_formatter else label
+        print(f'{indent}{INDENT}{number}) {shown}')
     while True:
         answer = _read(question, indent)
-        if not answer and default_all:
-            return list(options)
+        if not answer and fallback:
+            return list(fallback)
         picked = [p for p in re.split(r'[,\s]+', answer) if p]
         if picked and all(p.isdigit() and 1 <= int(p) <= len(options) for p in picked):
-            numbers = list(dict.fromkeys(int(p) - 1 for p in picked)) if keep_order else sorted({int(p) - 1 for p in picked})
+            numbers = (list(dict.fromkeys(int(p) - 1 for p in picked)) if keep_order
+                       else sorted({int(p) - 1 for p in picked}))
             return [options[i] for i in numbers]
         print(f'{indent}Please type numbers from 1 to {len(options)}, e.g. 1,3.')
+
+
+def ask_numbers(question: str, count: int, depth: int = 1) -> List[int]:
+    """Numbers from 1 to ``count`` separated by commas; Enter gives an empty list (none)."""
+    indent = _question_printer(question, depth, '(numbers separated by commas, Enter = none):')
+    while True:
+        answer = _read(question, indent)
+        if not answer:
+            return []
+        picked = [p for p in re.split(r'[,\s]+', answer) if p]
+        if all(p.isdigit() and 1 <= int(p) <= count for p in picked):
+            return sorted({int(p) for p in picked})
+        print(f'{indent}Please type numbers from 1 to {count}, e.g. 1,3.')
 
 
 def clean_path(text: str) -> str:
