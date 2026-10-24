@@ -12,6 +12,7 @@ from utils_shared.helpers import simplify_name
 # %% DEFAULT ANSWERS ---------------------------------------------------------------------------------------------------------------------------------
 DEFAULT_ANSWERS = {
     "ignore_first_minutes": 5.0,        # skipped when baselines, % ranges and y-axis limits are worked out (the data is still plotted)
+    "ignore_last_minutes": 0.0,         # the same at the end of the recording
     "decompose": False, "fit_file": None, "decomposition_dataset": "Cyt",
     "normalise_od": False,
     "averaging": False, "window_minutes": 2.0, "gap_minutes": 0.5, "final_gap_minutes": 0.5,
@@ -20,16 +21,21 @@ DEFAULT_ANSWERS = {
     "event_label_angle": 45,                                 # event label rotation in degrees: 0 = horizontal, 90 = vertical
     "plot_haems": False, "haems": [], "haem_mode": "delta",  # "abs", "delta", "conc" or "percent"
     "haem_per_od": True,                                     # divide the haem values (not "percent") by OD x volume x dilution when OD scaling is on
-    "journal": "nature", "columns": 1, "height": 0.5,
-    "comparison_columns": 2, "comparison_height": 0.5,       # size of the side-by-side comparison figure
+    # Figure sizes. Each figure has its own journal, width (columns) and height (fraction of a page).
+    # The *_size_mode answer is "default" (the journal question was answered None: Nature and the size below) or "custom".
+    "journal": "nature", "columns": 1, "height": 0.5, "size_mode": "default",
+    "plot_comparison": False,
+    "comparison_journal": "nature", "comparison_columns": 1.5, "comparison_height": 0.7, "comparison_size_mode": "default",
+    "plot_exemplar": False, "ho_exemplar_run": 1,
+    "ex_journal": "nature", "ho_ex_columns": 1.5, "ho_ex_height": 0.7, "ex_size_mode": "default",
     "export_full": False, "export_spectra": False,
-    # special figures (see utils_custom): time response, and haem and OCR response (publication + exemplar figures)
+    # special figures (see utils_custom): time response, and haem and OCR response
     "plot_time_response": False, "plot_haem_ocr": False,
     "tr_groups": ["knockdown", "control"], "tr_window_minutes": 1.0, "tr_gap_minutes": 0.5, "tr_final_gap_minutes": 0.5,
-    "tr_examples": [], "tr_columns": 2, "tr_height": 0.9,
+    "tr_examples": [], "tr_journal": "nature", "tr_columns": 2, "tr_height": 0.75, "tr_size_mode": "default",
     "ho_haem_mode": "delta", "ho_per_od": True, "ho_metric": "delta", "ho_haems": [], "ho_ocr_mode": "od",
-    "ho_window_minutes": 2.0, "ho_gap_minutes": 0.5, "ho_final_gap_minutes": 0.5, "ho_exemplar_run": 1,
-    "ho_pub_columns": 2, "ho_pub_height": 1.0, "ho_ex_columns": 1.5, "ho_ex_height": 0.7,
+    "ho_window_minutes": 2.0, "ho_gap_minutes": 0.5, "ho_final_gap_minutes": 0.5,
+    "ho_journal": "nature", "ho_pub_columns": 2, "ho_pub_height": 0.75, "ho_size_mode": "default",
 }
 
 TRANSMISSION_MODE = "fraction"          # "fraction", "percentage" or "absorbance"
@@ -150,7 +156,8 @@ class Config:
                 a["decompose"] and a["plot_haems"] and a["haem_mode"] == "percent")
 
     # ---- the settings of the individual-experiment plot (same keys and defaults as the original PLOT_CONFIG)
-    def plot_config(self, vo2_source, haem_source):
+    def plot_config(self, vo2_source, haem_source, ignore_first=None, ignore_last=None):
+        """``ignore_first`` / ``ignore_last`` (minutes) override the answers for one file."""
         a, style, fonts = self.answers, self.STYLE, self.FONTS
         haems = list(a["haems"]) if (a["decompose"] and a["plot_haems"] and haem_source) else []
         return {
@@ -180,7 +187,8 @@ class Config:
             "X_MIN": None,
             "X_MAX": None,
             "X_NUM_TICKS": None,
-            "Y_SCALE_IGNORE_FIRST_MINUTES": a["ignore_first_minutes"],
+            "Y_SCALE_IGNORE_FIRST_MINUTES": a["ignore_first_minutes"] if ignore_first is None else ignore_first,
+            "Y_SCALE_IGNORE_LAST_MINUTES": a["ignore_last_minutes"] if ignore_last is None else ignore_last,
             "Y_LABEL_PAD": style["label_pad"],
             "ALIGN_Y_LABELS": True,
             "TICK_FONT_SIZE": fonts["tick"],

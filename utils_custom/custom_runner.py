@@ -321,19 +321,64 @@ def haem_ocr_runner(experiments: dict,
         print(f'  Publication figure not made: {type(exc).__name__}: {exc}')
         plt.close('all')
 
-    # ---- 3 Exemplar figure -----------------------------------------------------
-    try:
-        settings_used = next(iter(triplicates.values()))['settings']
-        shown = [h for h in haem_names if h in answers['ho_haems']]
-        individual = individual_config_builder(answers,
-                                               settings_used['vo2_source'],
-                                               settings_used['haem_source'],
-                                               shown,
-                                               )
-        config = exemplar_config_builder(cfg, answers)
-        fig, _ = exemplar_figure_plotter(experiments, config, individual)
-        publication_figure_saver(fig, export_root, config)
-        plt.close(fig)
-    except Exception as exc:
-        print(f'  Exemplar figure not made: {type(exc).__name__}: {exc}')
-        plt.close('all')
+
+# ---- EXEMPLAR RUNNER -----------------------------------------------------------------
+
+def exemplar_runner(chosen: dict,
+                    cfg: Config,
+                    answers: dict,
+                    fit: Optional[dict],
+                    export_root: Path,
+                    ) -> None:
+    """
+    ---- Summary ----
+    Main function to draw the 2x2 figure: one experiment for each strain and addition
+    order, plotted like the individual experiment figures.
+
+    ---- Inputs ----
+    chosen : dict
+        {experiment name: kept result of process_experiment} with the keys
+        experiment, vo2_source and haem_source (DATA_FORMAT.md).
+    cfg : Config
+        Figure style of this figure (its own journal).
+    answers : dict
+        Terminal answers; uses haems, plot_haems and the ho_ex_* and ho_exemplar_run
+        settings.
+    fit : Optional[dict]
+        Fit dictionary, or None when the haems were not decomposed.
+    export_root : Path
+        Results folder.
+
+    ---- Globals read ----
+    custom_config.OUTPUT_SUBFOLDER.
+
+    ---- Outputs ----
+    None
+        Nothing; the figure files are written.
+
+    ---- Globals mutated ----
+    None. Writes the figure files (side effect).
+
+    ---- Equations ----
+    None.
+    """
+
+    # ---- 1 Choose the data plotted ---------------------------------------------
+    experiments = {name: item['experiment'] for name, item in chosen.items()}
+    first = next(iter(chosen.values()))
+    shown = []
+    if fit is not None and answers['plot_haems']:
+        shown = [h for h in fit['haem_list'] if h in answers['haems']]
+    haem_source = first['haem_source'] if shown else None
+    figure_answers = dict(answers, journal=cfg.answers['journal'])
+    individual = individual_config_builder(figure_answers,
+                                           first['vo2_source'],
+                                           haem_source,
+                                           shown,
+                                           )
+
+    # ---- 2 Draw and save the figure --------------------------------------------
+    config = exemplar_config_builder(cfg, answers)
+    fig, _ = exemplar_figure_plotter(experiments, config, individual)
+    publication_figure_saver(fig, export_root, config)
+    plt.close(fig)

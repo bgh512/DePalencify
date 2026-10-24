@@ -1,87 +1,32 @@
-"""Terminal questions for the time response and haem and OCR response figures."""
-from typing import Optional
+"""Numbered terminal questions of section 6: the time response and the haem and OCR
+response figures."""
+from pathlib import Path
+from typing import List, Optional
 
 from utils_custom.run_namer import group_assigner, hours_parser, run_name_lister
 from utils_shared.questions import (ask_choice,
                                     ask_multi,
-                                    ask_number,
                                     ask_text,
                                     ask_yes_no,
+                                    info,
                                     )
-
-HAEM_MODE_OPTIONS = [('delta', 'Delta A (change in absorbance from the start, mOD)'),
-                     ('abs', 'Absorbance (mOD)'),
-                     ('conc', 'Concentration'),
-                     ]
-METRIC_LABELS = {'delta': "Change from each run's baseline, in the units of the data",
-                 'change': "Percentage of each run's baseline",
-                 'value': 'The window average as it is',
-                 }
+from utils_shared.survey import averaging_asker, decomposition_asker, size_asker
 
 
-# ---- CUSTOM CHOICE ASKER -------------------------------------------------------------
+# ---- WINDOW ENSURER ------------------------------------------------------------------
 
-def custom_choice_asker(defaults: dict) -> tuple:
+def _window_ensurer(answers: dict, defaults: dict) -> None:
     """
     ---- Summary ----
-    Main function to ask which of the special figures to make.
+    Helper function to make sure the event-window settings exist for the special
+    figures: they reuse the section 3 settings, which are asked here if event
+    averaging was switched off there.
 
     ---- Inputs ----
-    defaults : dict
-        Default answers (config.DEFAULT_ANSWERS plus the remembered answers).
-
-    ---- Globals read ----
-    None.
-
-    ---- Outputs ----
-    tuple
-        (plot_time_response, plot_haem_ocr) as booleans.
-
-    ---- Globals mutated ----
-    None. Reads from and prints to the terminal (side effect).
-
-    ---- Equations ----
-    None.
-    """
-    plot_time_response = ask_yes_no('Plot a time response (difference spectra of '
-                                    'control vs knockdown '
-                                    'time points)?',
-                                    defaults['plot_time_response'],
-                                    )
-    plot_haem_ocr = ask_yes_no('Plot a haem and OCR response (the large publication '
-                               'figure and the '
-                               'four-run exemplar figure)?',
-                               defaults['plot_haem_ocr'],
-                               )
-    return plot_time_response, plot_haem_ocr
-
-
-# ---- SIZE ASKER ----------------------------------------------------------------------
-
-def _size_asker(title: str,
-                spec: dict,
-                defaults: dict,
-                column_key: str,
-                height_key: str,
-                answers: dict,
-                ) -> None:
-    """
-    ---- Summary ----
-    Helper function to ask the width and height of one custom figure.
-
-    ---- Inputs ----
-    title : str
-        Name of the figure, shown in the questions.
-    spec : dict
-        Journal specification (config.JOURNAL_SPECS entry).
+    answers : dict
+        Answers dictionary; uses averaging, window_minutes and gap_minutes.
     defaults : dict
         Default answers.
-    column_key : str
-        Key of the width answer.
-    height_key : str
-        Key of the height answer.
-    answers : dict
-        Answers dictionary the two values are stored in.
 
     ---- Globals read ----
     None.
@@ -91,46 +36,37 @@ def _size_asker(title: str,
         Nothing.
 
     ---- Globals mutated ----
-    None. Stores the width and height in ``answers`` (side effect).
+    None. Stores the tr_* and ho_* window answers in ``answers`` (side effect).
 
     ---- Equations ----
     None.
     """
-    widths = spec['widths_mm']
-    options = [(c, f'{c:g} column(s) wide ({mm} mm)') for c, mm in widths.items()]
-    default = defaults[column_key] if defaults[column_key] in widths else options[-1][0]
-    answers[column_key] = ask_choice(f'{title} width', options, default)
-    page_mm = spec['page_height_mm']
-    answers[height_key] = ask_number(f'{title} height as a fraction of the page height'
-                                     f' '
-                                     f'(1 = a full page = {page_mm:g} mm)',
-                                     defaults[height_key],
-                                     minimum=0,
-                                     exclusive_minimum=True,
-                                     maximum=1,
-                                     )
+    if not answers['averaging'] and not answers.get('window_asked'):
+        info('This figure averages around the events, like section 3.3.', depth=2)
+        averaging_asker(answers, defaults, forced=True, depth=2)
+    for prefix in ('tr', 'ho'):
+        answers[f'{prefix}_window_minutes'] = answers['window_minutes']
+        answers[f'{prefix}_gap_minutes'] = answers['gap_minutes']
+        answers[f'{prefix}_final_gap_minutes'] = answers['final_gap_minutes']
 
 
 # ---- TIME RESPONSE ASKER -------------------------------------------------------------
 
-def _time_response_asker(names: list,
+def _time_response_asker(names: List[str],
                          answers: dict,
                          defaults: dict,
-                         spec: dict,
                          ) -> Optional[dict]:
     """
     ---- Summary ----
-    Helper function to ask the settings of the time response figure.
+    Helper function to ask the settings of the time response figure (6.1.x).
 
     ---- Inputs ----
-    names : list
+    names : List[str]
         Experiment names (file names without the extension).
     answers : dict
         Answers dictionary the settings are stored in.
     defaults : dict
         Default answers.
-    spec : dict
-        Journal specification.
 
     ---- Globals read ----
     None.
@@ -148,109 +84,97 @@ def _time_response_asker(names: list,
     """
 
     # ---- 1 Find the experiments of each group ---------------------------------
-    print('\n  Time response: each file name needs a group word and the hours, for')
-    print("  example 'control_7hours' or 'knockdown_24hours'.")
-    text = ask_text('  The two group words, separated by a comma',
+    info("File names need a group word and the hours, e.g. 'control_7hours'.",
+         depth=2,
+         )
+    text = ask_text('What are the two group words, separated by a comma?',
                     ','.join(defaults['tr_groups']),
+                    depth=2,
                     )
     groups = [word.strip().lower() for word in text.split(',') if word.strip()]
     if len(groups) != 2:
-        print('  Two group words are needed, so the time response is skipped.')
+        info('Two group words are needed, so the time response is skipped.', depth=2)
         return None
     found = group_assigner({name: {} for name in names}, groups)
     members = {name: experiment['group'] for name, experiment in found.items()}
     for group in groups:
         listed = [n for n, g in members.items() if g == group]
-        print(f'    {group}: {", ".join(listed) if listed else "no files found"}')
+        info(f'{group}: {", ".join(listed) if listed else "no files found"}',
+             depth=2,
+             )
     if any(group not in members.values() for group in groups):
-        print('  Both groups need at least one file, so the time response is skipped.')
+        info('Both groups need at least one file, so the time response is skipped.',
+             depth=2,
+             )
         return None
-    unread = [n for n in members if hours_parser(n) is None]
-    if unread:
-        print(f'  No hours found in: {", ".join(unread)} (they are left out of the '
-              f'examples).',
-              )
     answers['tr_groups'] = groups
 
-    # ---- 2 Averaging windows --------------------------------------------------
-    answers['tr_window_minutes'] = ask_number('  Length of each spectral averaging '
-                                              'window (minutes)',
-                                              defaults['tr_window_minutes'],
-                                              minimum=0,
-                                              exclusive_minimum=True,
-                                              )
-    answers['tr_gap_minutes'] = ask_number('  How long before the next addition each '
-                                           'window ends (minutes)',
-                                           defaults['tr_gap_minutes'],
-                                           minimum=0,
-                                           )
-    answers['tr_final_gap_minutes'] = ask_number('  How long before the end of the '
-                                                 'recording the last window ends '
-                                                 '(minutes)',
-                                                 defaults['tr_final_gap_minutes'],
-                                                 minimum=0,
-                                                 )
-
-    # ---- 3 The two example experiments ----------------------------------------
+    # ---- 2 The two example experiments ------------------------------------------
     timed = [n for n in members if hours_parser(n) is not None]
     options = [(n, f'{n} ({members[n]}, {hours_parser(n):g} hours)') for n in timed]
     if len(options) < 2:
-        print('  Two experiments with hours are needed for the examples, so the time '
-              'response is skipped.',
-              )
+        info('Two experiments with hours in their name are needed for the examples, '
+             'so the time response is skipped.',
+             depth=2,
+             )
         return None
     first_group = [n for n in timed if members[n] == groups[0]]
-    left = ask_choice('  Example shown in the left panels', options, first_group[0])
-    right = ask_choice('  Example shown in the right panels',
+    left = ask_choice('Which experiment should the left example show?',
+                      options,
+                      first_group[0],
+                      depth=2,
+                      )
+    right = ask_choice('Which experiment should the right example show?',
                        options,
                        first_group[-1] if first_group[-1] != left else options[-1][0],
+                       depth=2,
                        )
     answers['tr_examples'] = [[members[left], hours_parser(left)],
                               [members[right], hours_parser(right)],
                               ]
 
-    # ---- 4 Figure size --------------------------------------------------------
-    _size_asker('  Time response figure',
-                spec,
-                defaults,
-                'tr_columns',
-                'tr_height',
-                answers,
-                )
+    # ---- 3 Figure size -----------------------------------------------------------
+    size_asker(answers,
+               defaults,
+               {'journal': 'tr_journal',
+                'columns': 'tr_columns',
+                'height': 'tr_height',
+                'mode': 'tr_size_mode',
+                },
+               (2, 0.75),
+               depth=2,
+               )
     return members
 
 
 # ---- HAEM OCR ASKER ------------------------------------------------------------------
 
-def _haem_ocr_asker(names: list,
+def _haem_ocr_asker(names: List[str],
                     answers: dict,
                     defaults: dict,
-                    spec: dict,
                     fit: dict,
-                    ) -> Optional[list]:
+                    ) -> Optional[List[str]]:
     """
     ---- Summary ----
-    Helper function to ask the settings of the haem and OCR response figures.
+    Helper function to ask the settings of the haem and OCR response figure (6.2.x).
 
     ---- Inputs ----
-    names : list
+    names : List[str]
         Experiment names (file names without the extension).
     answers : dict
         Answers dictionary the settings are stored in.
     defaults : dict
         Default answers.
-    spec : dict
-        Journal specification.
     fit : dict
-        Fit dictionary (haem_list and data) used to list the haems.
+        Fit dictionary (haem_list) used to list the haems.
 
     ---- Globals read ----
     None.
 
     ---- Outputs ----
-    Optional[list]
-        Names of the experiments that belong to the figures, or None when the figures
-        cannot be made from these files.
+    Optional[List[str]]
+        Names of the experiments that belong to the figure, or None when it cannot be
+        made from these files.
 
     ---- Globals mutated ----
     None. Stores the settings in ``answers`` (side effect).
@@ -259,148 +183,110 @@ def _haem_ocr_asker(names: list,
     None.
     """
 
-    # ---- 1 Show how the file names are read ------------------------------------
-    print('\n  Haem and OCR response: each file name needs the strain (control or')
-    print('  knockdown), the addition order (e.g. kcn_then_bd or bd_then_kcn) and')
-    print("  the run number, for example 'knockdown_kcn_then_bd_run1'.")
+    # ---- 1 Show how the file names are read --------------------------------------
+    info('File names need the strain, the addition order and the run number, e.g. '
+         "'knockdown_kcn_then_bd_run1'.",
+         depth=2,
+         )
     rows = run_name_lister(names)
-    usable = []
-    for row in rows:
-        known = all(row[key] is not None for key in ('strain', 'order', 'run'))
-        if known:
-            usable.append(row)
-            description = f"{row['strain']}, {row['order']}, run {row['run']}"
-        else:
-            description = 'not recognised, left out'
-        print(f"    {row['name']}: {description}")
+    usable = [r for r in rows
+              if all(r[key] is not None for key in ('strain', 'order', 'run'))
+              ]
+    left_out = [r['name'] for r in rows if r not in usable]
     if not usable:
-        print('  None of the files can be used, so the haem and OCR response is '
-              'skipped.',
-              )
+        info('None of the file names fit, so the haem and OCR response is skipped.',
+             depth=2,
+             )
         return None
     conditions = {(r['strain'], r['order']) for r in usable}
-    print(f'  {len(usable)} file(s) in {len(conditions)} condition(s) will be used.')
+    info(f'{len(usable)} file(s) in {len(conditions)} condition(s) will be used.',
+         depth=2,
+         )
+    if left_out:
+        info(f'Left out (name not recognised): {", ".join(left_out)}', depth=2)
 
-    # ---- 2 Haems, metric and OCR -----------------------------------------------
-    mode = ask_choice('  Show the haems as',
-                      HAEM_MODE_OPTIONS,
-                      defaults['ho_haem_mode'],
-                      )
-    answers['ho_haem_mode'] = mode
-    answers['ho_per_od'] = (ask_yes_no('  Divide the haem values by OD as well?',
-                                       defaults['ho_per_od'],
-                                       )
-                            if answers['normalise_od']
-                            else False
-                            )
-    metrics = ['delta', 'value'] if mode == 'delta' else ['delta', 'change', 'value']
-    if mode == 'delta':
-        print('  (A percentage of baseline is not available for delta A, which '
-              'starts at 0.)',
-              )
-    answers['ho_metric'] = ask_choice('  What the haem response shows',
-                                      [(m, METRIC_LABELS[m]) for m in metrics],
-                                      defaults['ho_metric']
-                                      if defaults['ho_metric'] in metrics
-                                      else 'delta',
-                                      )
-    names_in_fit = list(fit['haem_list'])
-    answers['ho_haems'] = ask_multi('  Which haems get a row in the haem response?',
-                                    names_in_fit,
-                                    default_all=True,
-                                    )
+    # ---- 2 What is shown ------------------------------------------------------------
+    answers['ho_ocr_mode'] = 'raw'
+    answers['ho_per_od'] = False
     if answers['normalise_od']:
-        answers['ho_ocr_mode'] = ask_choice('  Which OCR',
-                                            [('od', 'OCR per OD'), ('raw', 'Raw OCR')],
+        answers['ho_ocr_mode'] = ask_choice('Which OCR would you like to use?',
+                                            [('od', 'OCR per OD (OCR/OD)'),
+                                             ('raw', 'Raw OCR'),
+                                             ],
                                             defaults['ho_ocr_mode'],
+                                            depth=2,
                                             )
-    else:
-        answers['ho_ocr_mode'] = 'raw'
+    answers['ho_haem_mode'] = ask_choice('How would you like to show the haems?',
+                                         [('abs', 'Absorbance (mOD)'),
+                                          ('delta', 'ΔA (mOD)'),
+                                          ('conc', 'Concentration'),
+                                          ],
+                                         defaults['ho_haem_mode'],
+                                         depth=2,
+                                         )
+    if answers['normalise_od']:
+        answers['ho_per_od'] = ask_yes_no('Do you want to scale the haems by OD as '
+                                          'well?',
+                                          defaults['ho_per_od'],
+                                          depth=2,
+                                          )
+    answers['ho_metric'] = 'delta'
+    answers['ho_haems'] = ask_multi('Which haems should get a row?',
+                                    list(fit['haem_list']),
+                                    default_all=True,
+                                    depth=2,
+                                    )
 
-    # ---- 3 Averaging windows ---------------------------------------------------
-    answers['ho_window_minutes'] = ask_number('  Length of each averaging window '
-                                              '(minutes)',
-                                              defaults['ho_window_minutes'],
-                                              minimum=0,
-                                              exclusive_minimum=True,
-                                              )
-    answers['ho_gap_minutes'] = ask_number('  How long before the next addition each '
-                                           'window ends (minutes)',
-                                           defaults['ho_gap_minutes'],
-                                           minimum=0,
-                                           )
-    answers['ho_final_gap_minutes'] = ask_number('  How long before the end of the '
-                                                 'recording the last window ends '
-                                                 '(minutes)',
-                                                 defaults['ho_final_gap_minutes'],
-                                                 minimum=0,
-                                                 )
-    runs = sorted({r['run'] for r in usable})
-    run_default = runs[0]
-    if defaults['ho_exemplar_run'] in runs:
-        run_default = defaults['ho_exemplar_run']
-    run_options = [(r, f'run {r}') for r in runs]
-    answers['ho_exemplar_run'] = int(ask_choice('  Run shown in the four-run exemplar '
-                                                'figure',
-                                                run_options,
-                                                run_default,
-                                                ),
-                                     )
-
-    # ---- 4 Figure sizes --------------------------------------------------------
-    _size_asker('  Publication figure',
-                spec,
-                defaults,
-                'ho_pub_columns',
-                'ho_pub_height',
-                answers,
-                )
-    _size_asker('  Exemplar figure',
-                spec,
-                defaults,
-                'ho_ex_columns',
-                'ho_ex_height',
-                answers,
-                )
+    # ---- 3 Figure size -----------------------------------------------------------
+    size_asker(answers,
+               defaults,
+               {'journal': 'ho_journal',
+                'columns': 'ho_pub_columns',
+                'height': 'ho_pub_height',
+                'mode': 'ho_size_mode',
+                },
+               (2, 0.75),
+               depth=2,
+               )
     return [r['name'] for r in usable]
 
 
-# ---- CUSTOM DETAIL ASKER -------------------------------------------------------------
+# ---- SUMMARY FIGURE ASKER ------------------------------------------------------------
 
-def custom_detail_asker(names: list,
-                        answers: dict,
-                        defaults: dict,
-                        fit: Optional[dict],
-                        wants_time_response: bool,
-                        wants_haem_ocr: bool,
-                        ) -> dict:
+def summary_figure_asker(names: List[str],
+                         answers: dict,
+                         defaults: dict,
+                         summaries: List[dict],
+                         fit: Optional[dict],
+                         fits_folder: Path,
+                         ) -> tuple:
     """
     ---- Summary ----
-    Main function to ask the settings of the special figures that were chosen, after
-    the journal is known.
+    Main function to ask section 6: whether to plot a time response and a haem and
+    OCR response, and the settings of each one chosen. Both need the haem fit, which
+    is asked for here if it was not chosen in section 3.
 
     ---- Inputs ----
-    names : list
+    names : List[str]
         Experiment names (file names without the extension).
     answers : dict
-        Answers dictionary the settings are stored in; must hold 'journal' and
-        'normalise_od'.
+        Answers dictionary the settings are stored in.
     defaults : dict
         Default answers.
+    summaries : List[dict]
+        File summaries (DATA_FORMAT.md), used if the fit has to be asked for.
     fit : Optional[dict]
-        Fit dictionary used to list the haems; required for both figures.
-    wants_time_response : bool
-        True when the time response was chosen.
-    wants_haem_ocr : bool
-        True when the haem and OCR response was chosen.
+        Fit dictionary chosen in section 3, or None.
+    fits_folder : Path
+        Folder holding the fit .csv files.
 
     ---- Globals read ----
-    config.JOURNAL_SPECS (through the answers' journal key).
+    None.
 
     ---- Outputs ----
-    dict
-        {'time_response': {experiment name: group} or None, 'haem_ocr': [experiment
-        names] or None}. None means the figure will not be made.
+    tuple
+        (fit, result). result is {'time_response': {name: group} or None,
+        'haem_ocr': [names] or None}; None means that figure will not be made.
 
     ---- Globals mutated ----
     None. Stores the settings in ``answers`` (side effect).
@@ -408,18 +294,43 @@ def custom_detail_asker(names: list,
     ---- Equations ----
     None.
     """
-    from config import JOURNAL_SPECS
-
-    spec = JOURNAL_SPECS[answers['journal']]
     result = {'time_response': None, 'haem_ocr': None}
-    if fit is None:
-        print('  The special figures need the haem fit, so they are skipped.')
-        answers['plot_time_response'] = answers['plot_haem_ocr'] = False
-        return result
-    if wants_time_response:
-        result['time_response'] = _time_response_asker(names, answers, defaults, spec)
-    if wants_haem_ocr:
-        result['haem_ocr'] = _haem_ocr_asker(names, answers, defaults, spec, fit)
-    answers['plot_time_response'] = result['time_response'] is not None
-    answers['plot_haem_ocr'] = result['haem_ocr'] is not None
-    return result
+    answers['plot_time_response'] = False
+    answers['plot_haem_ocr'] = False
+    for key, question, asker in (('time_response',
+                                  'Do you want to plot a time response?',
+                                  None,
+                                  ),
+                                 ('haem_ocr',
+                                  'Do you want to plot a haem and OCR response?',
+                                  None,
+                                  ),
+                                 ):
+        if not ask_yes_no(question, defaults[f'plot_{key}']):
+            continue
+
+        # ---- 1 Make sure the haems are decomposed -------------------------------
+        if fit is None:
+            info('This figure needs the haems, so they are decomposed.', depth=2)
+            (answers['decompose'],
+             answers['fit_file'],
+             fit,
+             answers['decomposition_dataset'],
+             ) = decomposition_asker(summaries,
+                                     defaults,
+                                     fits_folder,
+                                     forced=True,
+                                     depth=2,
+                                     )
+            if fit is None:
+                info('No haem fit is available, so this figure is skipped.', depth=2)
+                continue
+
+        # ---- 2 Ask the settings of the figure -------------------------------------
+        _window_ensurer(answers, defaults)
+        if key == 'time_response':
+            result[key] = _time_response_asker(names, answers, defaults)
+        else:
+            result[key] = _haem_ocr_asker(names, answers, defaults, fit)
+        answers[f'plot_{key}'] = result[key] is not None
+    return fit, result

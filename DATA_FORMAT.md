@@ -9,7 +9,8 @@ the processing steps.
 | --- | --- | --- |
 | `experiment_name` | str | file stem |
 | `metadata` | dict | `OD`, `volume`, `dilution_factor`, `events` |
-| `metadata['events']` | list of dict | `datapoint`, `text`, `label`, `concentration_uM`, `time` (min) |
+| `metadata['events']` | list of dict | `datapoint`, `text`, `label`, `concentration_uM`, `time` (min); ignored events are removed from this list |
+| `metadata['ignored_events']` | list of dict | the events labelled `ignore`; still written to the workbook's Events sheet (`ignored` column) |
 | `CcO2`, `CsO2`, `VoO2` | DataFrame | measured O2, set O2, OCR against time |
 | `VoO2_OD` | DataFrame | OCR divided by dilution x OD x volume |
 | `haem_conc`, `haem_abs`, `haem_delta_abs` (+ `_OD`) | DataFrame | decomposed haems |
@@ -46,3 +47,10 @@ haem, the list of runs, and `settings` copied from the runs' `averages`.
 <results>/<experiment>/                    figure files
 <results>/publication_figure/              special figures and their tables
 ```
+
+## last_answers.json
+
+`{'data_folder', 'export_folder', 'answers': {...}, 'files': {file name: {'trim_start',
+'trim_end', 'ignore_start', 'ignore_end'}}}`. Times are in minutes. Trim times are on the
+original recording; ignore times count from the new 0 after trimming. The values are
+offered as defaults on the next run.

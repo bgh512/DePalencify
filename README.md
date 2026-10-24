@@ -8,14 +8,26 @@ per experiment.
 
 ## What it asks, in order
 
-1. Files, results folder
-2. Settling time to ignore, trimming at start and end
-3. Analysis: haem decomposition (fit), OD scaling, event averaging
-4. What to plot, event-label angle, optional side-by-side comparison of two runs
-5. **Special figures** (new): time response, then haem and OCR response
-6. Figure size (journal, width, height)
-7. Settings of the special figures (only if you chose them)
-8. Data export, then OD / volume / dilution and event labels for each file
+Questions are numbered, shown in colour, and the answer is typed on the line below
+(Enter accepts the [default]). Follow-up questions are indented and numbered one level
+deeper (3.1 then 3.1.1).
+
+1. **Your files**: the .paf folder, the results folder
+2. **Trimming and ignoring**: TRIM (data that is not imported, plotted or used) and
+   IGNORE (data that is plotted but not used for calculations), each for the start and
+   the end. Ignore times count from the new 0 after trimming. The values are
+   remembered per file for the next run.
+3. **Analysis**: decompose the haems (which fit), scale by OD (OD, volume and dilution
+   factor per file), average around the events (window, gap), change event labels.
+   Write `ignore` as an event's label to ignore an event that was not an addition.
+4. **Individual experiment plots**: oxygen, OCR, haems, event-label angle, journal and size
+5. **Multi-experiment plots**: two experiments side by side, four experiments in a 2x2 grid
+6. **Experiment summaries**: time response, haem and OCR response
+7. **Data export**, then a summary and the start question
+
+Every figure asks for its own journal. Answering `None` uses Nature with the default
+size: individual 1 column x 0.5 page, side by side and 2x2 1.5 columns x 0.7 page, time
+response and haem and OCR response 2 columns x 0.75 page.
 
 ## Special figures
 
@@ -34,9 +46,12 @@ decomposed into haems. Output: `publication_figure/time_response_figure.*`,
 File names need strain, addition order and run: `knockdown_kcn_then_bd_run1`,
 `control_bd_then_kcn_run2`. Runs of one condition are combined (mean, SEM,
 Student t-tests with Holm correction). Output in `publication_figure/`:
-`publication_figure.*` (baseline OCR bars, OCR response, haem response),
-`exemplar_figure.*` (one run of each of the four conditions) and
-`triplicate_summary.xlsx`.
+`publication_figure.*` (baseline OCR bars, OCR response, haem response) and
+`triplicate_summary.xlsx`. The averaging windows are those of section 3.
+
+### Four experiments in a 2x2 grid (section 5)
+One run of each strain and addition order, drawn like the individual figures:
+`exemplar_figure.*` in `publication_figure/`.
 
 Files whose names do not fit are listed and left out of that figure only.
 

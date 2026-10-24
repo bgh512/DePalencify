@@ -69,9 +69,10 @@ class _HideTopTickLabels(ScalarFormatter):
         return super().__call__(x, pos)
 
 
-def _ylim_ignoring_start(times, series, ignore_minutes, margin=0.05):
-    """(low, high) of the data after the first ``ignore_minutes``, plus a margin; None if no finite data remain."""
-    keep = np.isfinite(times) & (times >= np.nanmin(times) + ignore_minutes)
+def _ylim_ignoring_start(times, series, ignore_minutes, margin=0.05, ignore_last_minutes=0.0):
+    """(low, high) of the data after the first ``ignore_minutes`` and before the last ``ignore_last_minutes``, plus a margin; None if no finite data remain."""
+    keep = (np.isfinite(times) & (times >= np.nanmin(times) + ignore_minutes)
+            & (times <= np.nanmax(times) - ignore_last_minutes))
     values = np.concatenate([np.asarray(s, dtype=float)[keep] for s in series])
     values = values[np.isfinite(values)]
     if values.size == 0:
@@ -226,7 +227,8 @@ def draw_experiment(fig, subplot_spec, experiment, config):
             _set_min_ticks(ax.yaxis, config["VO2_Y_NUM_TICKS"])
             y_max = config["VO2_Y_MAX"]
             if config["VO2_Y_PERCENTILE_MAX"] is not None and np.isfinite(y).any():
-                keep = np.isfinite(y) & (t >= np.nanmin(t) + config["Y_SCALE_IGNORE_FIRST_MINUTES"])
+                keep = (np.isfinite(y) & (t >= np.nanmin(t) + config["Y_SCALE_IGNORE_FIRST_MINUTES"])
+                        & (t <= np.nanmax(t) - config.get("Y_SCALE_IGNORE_LAST_MINUTES", 0.0)))
                 if keep.any():
                     y_max = np.percentile(y[keep], config["VO2_Y_PERCENTILE_MAX"])
             ax.set_ylim(config["VO2_Y_MIN"], y_max)
@@ -242,7 +244,8 @@ def draw_experiment(fig, subplot_spec, experiment, config):
                 ax.set_ylim(config["HAEM_Y_MIN"], config["HAEM_Y_MAX"])
             else:
                 limits = _ylim_ignoring_start(t, [get_values(haem_data, h) for h in panel["haems"]],
-                                              config["Y_SCALE_IGNORE_FIRST_MINUTES"])
+                                              config["Y_SCALE_IGNORE_FIRST_MINUTES"],
+                                              ignore_last_minutes=config.get("Y_SCALE_IGNORE_LAST_MINUTES", 0.0))
                 if limits:
                     ax.set_ylim(*limits)
 

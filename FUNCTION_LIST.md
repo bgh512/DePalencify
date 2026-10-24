@@ -6,16 +6,11 @@ Generated from the source. Names starting with `_` are private helpers.
 
 - `load_last_answers`
 - `save_last_answers`
-- `find_paf_files`
-- `ask_files`: Ask for the folder of .paf files; returns (folder, [summary of each readable file]).
-- `ask_trimming`: Returns {file name: {"start": minutes or None, "end": minutes or None}}. All times are on the original recording's clock.
-- `ask_decomposition`: Returns (decompose, fit_file, fit, dataset). ``forced`` skips the yes/no question (the special figures need the haems).
-- `ask_experiment_details`: OD, volume, dilution factor and event labels for one file; offers the values saved in its workbook last time.
 - `ask_everything`: Ask all the questions. Returns (answers, results folder, per-experiment info, fit, comparison pair or None).
 - `merge_event_settings`: Copy the label and concentration entered for each event onto the experiment's events (matched by datapoint).
 - `process_experiment`: Read, process, plot and export one .paf. Each step reports its own problem and the next step still runs.
-- `make_comparison`: The side-by-side figure of the two chosen runs (skipped, with the reason, if either one failed or they were plotted differently).
-- `make_special_figures`: The time response and the haem and OCR response figures (each skipped, with the reason, if it cannot be made).
+- `make_comparison`
+- `make_special_figures`: The time response, haem and OCR response and 2x2 figures (each skipped, with the reason, if it cannot be made).
 - `main`
 
 ## config.py
@@ -72,7 +67,7 @@ Generated from the source. Names starting with `_` are private helpers.
 - `_legend`: Legend with an optional thin box. ``text_only`` drops the coloured line beside each entry (used for the haem panels,
 - `watermark_style`: Text keyword arguments for the faint run-name watermark (TITLE_STYLE = "watermark").
 - `_set_min_ticks`: Make sure an axis has at least ``count`` ticks (None = automatic). Positions stay 'nice' round values, so it can be one more.
-- `_ylim_ignoring_start`: (low, high) of the data after the first ``ignore_minutes``, plus a margin; None if no finite data remain.
+- `_ylim_ignoring_start`: (low, high) of the data after the first ``ignore_minutes`` and before the last ``ignore_last_minutes``, plus a margin; None if no finite data remain.
 - `_height_ratios`: Relative panel heights from PANEL_HEIGHT_RATIOS ({"oxygen": a, "vo2": b, "haem": c})
 - `_window_label`: Text for an averaging window from AVERAGING_WINDOW_LABEL_FORMAT ({n} = number, {name} = e.g. "average3"; "" = no label).
 - `_select_haem_data`: Return (haem DataFrame or None, source name).
@@ -106,14 +101,22 @@ Generated from the source. Names starting with `_` are private helpers.
 
 ## utils_shared/questions.py
 
-- `_read`
-- `heading`
-- `ask_text`
-- `ask_yes_no`
-- `ask_number`: A number; with ``allow_blank`` an empty answer gives None (when there is no default).
+- `colour_enabled`: True when the terminal can show colour (and NO_COLOR is not set).
+- `coloured`: ``text`` wrapped in a colour code, or unchanged when colour is not available.
+- `italic`: ``text`` in italics when the terminal supports it, otherwise in plain brackets-free text.
+- `section_starter`: Start the next numbered section and print its heading.
+- `numbering_restarter`: Make the next question at ``depth`` (and deeper) start again from 1.
+- `_number_builder`: The next question number at ``depth`` (1 = 3.1, 2 = 3.1.1, ...).
+- `_question_printer`: Print the numbered question line; returns the indent used for the answer prompt.
+- `_read`: Show the answer prompt and return what was typed (``text`` is the question, for tests).
+- `info`: Print an information line (not a question), indented to sit under the question above.
+- `ask_text`: A line of text; Enter gives ``default``. The default is shown as [default]
+- `ask_yes_no`: y or n; Enter gives ``default`` (the capital letter in the hint).
+- `ask_number`: A number; with ``allow_blank`` an empty answer (when there is no default) gives None.
 - `ask_choice`: ``options`` is a list of (key, label). The user types the number; returns the key. ``default`` is a key.
-- `ask_multi`: Several of ``options`` (a list of labels): numbers separated by commas, or Enter for all. Returns the chosen labels.
+- `ask_multi`: Several of ``options``: numbers separated by commas (Enter = all). With ``keep_order`` the typed order is kept.
 - `clean_path`: A path typed or dragged into the window: drop surrounding quotes and spaces.
+- `heading`: A plain heading (used for the summary).
 
 ## utils_shared/run_logging.py
 
@@ -138,6 +141,22 @@ Generated from the source. Names starting with `_` are private helpers.
 - `calculate_delta_abs`: Shift every haem's absorbance additively so that its reference level is 0, giving a change in absorbance (mOD)
 - `decompose_experiment`: Decompose every spectrum of one dataset and store ``experiment["haem_conc"]``, ``experiment["haem_abs"]`` and
 
+## utils_shared/survey.py
+
+- `_columns_text`: Helper function to write a figure width in columns, e.g. '1 column' or '1.5 columns'.
+- `paf_finder`: Helper function to list the .paf files directly inside a folder, by name.
+- `files_asker`: Main function to ask for the folder of .paf files (1.1) and the results folder (1.2), and to read a summary of every file.
+- `_limits_asker`: Helper function to ask one yes/no question and then one number per file (trim or ignore, start or end), offering the values remembered from the last run.
+- `trim_asker`: Main function to ask section 2: which data is trimmed away (start, end) and which is ignored in the calculations (start, end), per file.
+- `decomposition_asker`: Main function to ask whether to decompose the spectra into haems and which fit to use.
+- `averaging_asker`: Main function to ask whether to average around the events, and the window settings.
+- `od_asker`: Main function to ask the OD, volume and dilution factor of every file, offering the values saved in each experiment's workbook.
+- `event_asker`: Main function to ask whether to change the event labels, concentrations and which events to ignore, file by file.
+- `analysis_asker`: Main function to ask section 3: haem decomposition, OD scaling, event averaging and the event labels.
+- `size_asker`: Main function to ask the journal, width and height of one figure. Answering None to the journal question uses Nature with the fallback width and height.
+- `plot_asker`: Main function to ask section 4: what the individual experiment figures show and how they are sized.
+- `multi_experiment_asker`: Main function to ask section 5: the side-by-side figure of two experiments and the 2x2 figure of four experiments.
+
 ## utils_shared/trimming.py
 
 - `trim_experiment`: Keep only ``start_time <= t <= end_time`` (either may be None)
@@ -153,11 +172,10 @@ Generated from the source. Names starting with `_` are private helpers.
 
 ## utils_custom/custom_questions.py
 
-- `custom_choice_asker`: Main function to ask which of the special figures to make.
-- `_size_asker`: Helper function to ask the width and height of one custom figure.
-- `_time_response_asker`: Helper function to ask the settings of the time response figure.
-- `_haem_ocr_asker`: Helper function to ask the settings of the haem and OCR response figures.
-- `custom_detail_asker`: Main function to ask the settings of the special figures that were chosen, after the journal is known.
+- `_window_ensurer`: Helper function to make sure the event-window settings exist for the special figures: they reuse the section 3 settings, which are asked here if event averaging was switched off there.
+- `_time_response_asker`: Helper function to ask the settings of the time response figure (6.1.x).
+- `_haem_ocr_asker`: Helper function to ask the settings of the haem and OCR response figure (6.2.x).
+- `summary_figure_asker`: Main function to ask section 6: whether to plot a time response and a haem and OCR response, and the settings of each one chosen. Both need the haem fit, which is asked for here if it was not chosen in section 3.
 
 ## utils_custom/custom_runner.py
 
@@ -166,6 +184,7 @@ Generated from the source. Names starting with `_` are private helpers.
 - `experiment_preparer`: Main function to prepare one processed experiment for the special figures. Each figure is prepared on its own, so a problem with one does not stop the other.
 - `time_response_runner`: Main function to export and draw the time response figure from the prepared experiments.
 - `haem_ocr_runner`: Main function to combine the runs of each condition and draw the haem and OCR response: the publication figure and the four-run exemplar figure. The two figures are drawn independently, so a problem with one does not stop the other.
+- `exemplar_runner`: Main function to draw the 2x2 figure: one experiment for each strain and addition order, plotted like the individual experiment figures.
 
 ## utils_custom/publication_plotter.py
 

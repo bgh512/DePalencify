@@ -36,15 +36,18 @@ from utils_shared.comparison_plotter import plot_comparison
 from utils_shared.figure_layout import figure_size_inches
 from utils_shared.paf_reader import PafError, load_experiment_from_paf, read_experiment_summary
 from utils_shared.trimming import trim_experiment
-from utils_shared.questions import (UserQuit, ask_choice, ask_multi, ask_number, ask_text, ask_yes_no, clean_path, heading)
+from utils_shared.questions import UserQuit, ask_yes_no, heading, section_starter
+from utils_shared.survey import (analysis_asker, files_asker, multi_experiment_asker, plot_asker,
+                                 trim_asker)
 from utils_shared.run_logging import start_logging, stop_logging
-from utils_custom.custom_questions import custom_choice_asker, custom_detail_asker
-from utils_custom.custom_runner import experiment_preparer, haem_ocr_runner, time_response_runner
-from utils_shared.spectral_decomposer import import_fit, decompose_experiment
+from utils_custom.custom_questions import summary_figure_asker
+from utils_custom.custom_runner import (exemplar_runner, experiment_preparer, haem_ocr_runner,
+                                        time_response_runner)
+from utils_shared.spectral_decomposer import decompose_experiment
 
 FITS_FOLDER = HERE / "fits"
 LAST_ANSWERS_FILE = HERE / "last_answers.json"
-JOURNAL_NAMES = {"nature": "Nature", "science": "Science", "cell": "Cell", "pnas": "PNAS"}
+from utils_shared.survey import JOURNAL_NAMES
 # %% QUESTIONS ---------------------------------------------------------------------------------------------------------------------------------------
 
 
@@ -62,277 +65,95 @@ def save_last_answers(values):
         pass                                   # a read-only folder just means the defaults are not remembered
 
 
-def find_paf_files(folder):
-    return sorted((p for p in Path(folder).iterdir() if p.is_file() and p.suffix.lower() == ".paf"), key=lambda p: p.name.lower())
-
-
-def ask_files(last):
-    """Ask for the folder of .paf files; returns (folder, [summary of each readable file])."""
-    heading("1. Your files")
-    while True:
-        text = ask_text("Folder containing the .paf files", last.get("data_folder"))
-        if not text:
-            print("  Please type or drag in a folder.")
-            continue
-        folder = Path(clean_path(text)).expanduser()
-        if not folder.is_dir():
-            print("  That folder does not exist.")
-            continue
-        files = find_paf_files(folder)
-        if not files:
-            print("  There are no .paf files directly inside that folder.")
-            continue
-        break
-
-    summaries = []
-    for path in files:
-        try:
-            summary = read_experiment_summary(path)
-        except PafError as exc:
-            print(f"  Skipping {path.name}: {exc}")
-            continue
-        summary["path"] = path
-        summaries.append(summary)
-    if not summaries:
-        raise SystemExit("None of the .paf files could be read.")
-    print(f"\n  Found {len(summaries)} readable file(s):")
-    for s in summaries:
-        print(f"    {s['name']}: {s['duration_min']:.1f} min, {len(s['events'])} event(s)")
-    return folder, summaries
-
-
-def ask_trimming(summaries):
-    """Returns {file name: {"start": minutes or None, "end": minutes or None}}. All times are on the original recording's clock."""
-    trims = {s["name"]: {"start": None, "end": None} for s in summaries}
-    if ask_yes_no("Do any of the files need trimming at the START (everything before a chosen time is discarded, and that time becomes 0)?", False):
-        for s in summaries:
-            first_event = min((e["time"] for e in s["events"]), default=s["duration_min"])
-            value = ask_number(f"  Start time for {s['name']} in minutes (first event is at {first_event:.1f} min; Enter = keep it all)",
-                               None, minimum=0, maximum=first_event, allow_blank=True)
-            if value:
-                trims[s["name"]]["start"] = value
-    if ask_yes_no("Do any of the files need trimming at the END (everything after a chosen time is discarded)?", False):
-        for s in summaries:
-            last_event = max((e["time"] for e in s["events"]), default=0.0)
-            start = trims[s["name"]]["start"] or 0.0
-            value = ask_number(f"  End time for {s['name']} in minutes (recording is {s['duration_min']:.1f} min, last event at {last_event:.1f}; Enter = keep it all)",
-                               None, minimum=max(last_event, start), allow_blank=True)
-            if value is not None and value < s["duration_min"]:
-                trims[s["name"]]["end"] = value
-    return trims
-
-
-def ask_decomposition(summaries, defaults, forced=False):
-    """Returns (decompose, fit_file, fit, dataset). ``forced`` skips the yes/no question (the special figures need the haems)."""
-    fits = sorted(FITS_FOLDER.glob("*.csv"), key=lambda p: p.name.lower())
-    if not fits:
-        print(f"  No fit files (.csv) were found in {FITS_FOLDER}, so haems cannot be decomposed this time.")
-        print("  Put a fit .csv in that folder and run again to get haem results.")
-        return False, None, None, defaults["decomposition_dataset"]
-    if not forced and not ask_yes_no("Decompose the spectra into haems?", defaults["decompose"]):
-        return False, None, None, defaults["decomposition_dataset"]
-    names = [p.name for p in fits]
-    fit_file = ask_choice("Which fit?", [(n, n) for n in names], defaults.get("fit_file") if defaults.get("fit_file") in names else names[0])
-    try:
-        fit = import_fit(FITS_FOLDER / fit_file)
-    except Exception as exc:
-        print(f"  The fit file could not be read ({exc}); haems will not be decomposed.")
-        return False, None, None, defaults["decomposition_dataset"]
-    common = set(summaries[0]["datasets"])
-    for s in summaries[1:]:
-        common &= set(s["datasets"])
-    if not common:
-        print("  The files have no spectrometer in common, so haems cannot be decomposed.")
-        return False, None, None, defaults["decomposition_dataset"]
-    dataset = defaults["decomposition_dataset"]
-    if dataset not in common:
-        options = sorted(common)
-        dataset = options[0] if len(options) == 1 else ask_choice("Which spectrometer holds the haem spectra?", [(o, o) for o in options], options[0])
-    return True, fit_file, fit, dataset
-
-
-def ask_experiment_details(summary, answers, export_root):
-    """OD, volume, dilution factor and event labels for one file; offers the values saved in its workbook last time."""
-    print(f"\n  {summary['name']}")
-    saved = read_saved_settings(export_root, summary["name"]) or {}
-    if saved:
-        print("    (earlier values found in this experiment's workbook are offered as defaults)")
-    details = {}
-    if answers["normalise_od"]:
-        details["OD"] = ask_number("    OD of the sample", saved.get("OD"), minimum=0, exclusive_minimum=True)
-        details["volume"] = ask_number("    Volume (same units as always)", saved.get("volume"), minimum=0, exclusive_minimum=True)
-        details["dilution_factor"] = ask_number("    Dilution factor", saved.get("dilution_factor", 1.0), minimum=0, exclusive_minimum=True)
-
-    saved_events = {e["datapoint"]: e for e in saved.get("events", [])}
-    events = []
-    if summary["events"]:
-        for number, event in enumerate(summary["events"], start=1):
-            old = saved_events.get(event["datapoint"], {})
-            events.append({"datapoint": event["datapoint"], "label": old.get("label") or event["text"],
-                           "concentration_uM": old.get("concentration_uM"), "ignored": bool(old.get("ignored", False))})
-        print("    Events in the file:")
-        for number, (event, entry) in enumerate(zip(summary["events"], events), start=1):
-            conc = "" if entry["concentration_uM"] is None else f"{entry['concentration_uM']:g} uM "
-            note = "   [IGNORED]" if entry["ignored"] else ""
-            print(f"      {number}) {event['time']:.2f} min   {conc}{entry['label']}{note}")
-        if ask_yes_no("    Change any labels or concentrations?", False):
-            for number, (event, entry) in enumerate(zip(summary["events"], events), start=1):
-                entry["label"] = ask_text(f"      Event {number} ({event['time']:.2f} min) label", entry["label"]) or entry["label"]
-                entry["concentration_uM"] = ask_number(f"      Event {number} concentration in uM (Enter = unknown)",
-                                                       entry["concentration_uM"], minimum=0, allow_blank=True)
-        # Events that were not additions (for example a dilution) are ignored everywhere.
-        # A label of "ignore" does the same, so it can also be set while changing labels.
-        for entry in events:
-            if entry["label"].strip().lower() == "ignore":
-                entry["ignored"] = True
-        current = [str(n) for n, entry in enumerate(events, start=1) if entry["ignored"]]
-        text = ask_text("    Ignore any of these events (not an addition, e.g. a dilution)? "
-                        "Numbers separated by commas, '-' for none", ",".join(current) or "-")
-        chosen = set()
-        for part in text.replace(" ", "").split(","):
-            if part.isdigit() and 1 <= int(part) <= len(events):
-                chosen.add(int(part))
-        for number, entry in enumerate(events, start=1):
-            entry["ignored"] = number in chosen
-    details["events"] = events
-    return details
-
-
 def ask_everything():
     """Ask all the questions. Returns (answers, results folder, per-experiment info, fit, comparison pair or None)."""
     last = load_last_answers()
     defaults = dict(settings.DEFAULT_ANSWERS, **last.get("answers", {}))
     answers = dict(defaults)
+    remembered = last.get("files", {})
 
     print("=" * 70)
-    print("  DePalencify")
-    print("  Press Enter to accept the value shown in [brackets].")
+    print("  DePalencify  V2.0 beta")
+    print("  Questions are in colour and numbered. Type your answer on the line below")
+    print("  each question; Enter accepts the value shown in [brackets].")
     print("=" * 70)
 
-    folder, summaries = ask_files(last)
-    heading("2. Where the results go")
-    text = ask_text("Folder for the results", last.get("export_folder") if last.get("data_folder") == str(folder) else str(folder / "export"))
-    export_root = Path(clean_path(text)).expanduser()
+    section_starter("Your files")
+    folder, summaries, export_root = files_asker(last)
+    names = [s["name"] for s in summaries]
 
-    heading("3. Settling time and trimming")
-    print("  (Trim times are the times on the original recording, as the event times listed above are.)")
-    answers["ignore_first_minutes"] = ask_number(
-        "How many minutes at the start should be ignored (while things settle)? This is left out when baselines, % ranges and axis limits\n"
-        "are worked out; the data is still plotted and exported", defaults["ignore_first_minutes"], minimum=0)
-    trims = ask_trimming(summaries)
+    section_starter("Trimming and ignoring")
+    limits = trim_asker(summaries, remembered)
+    answers["ignore_first_minutes"] = max(v["ignore_start"] for v in limits.values())
+    answers["ignore_last_minutes"] = max(v["ignore_end"] for v in limits.values())
 
-    heading("4. Analysis")
-    answers["decompose"], answers["fit_file"], fit, answers["decomposition_dataset"] = ask_decomposition(summaries, defaults)
-    answers["normalise_od"] = ask_yes_no("Scale by OD (divide by dilution factor x OD x volume)?", defaults["normalise_od"])
-    answers["averaging"] = ask_yes_no("Do event averaging (average a window before each addition)?", defaults["averaging"])
-    if answers["averaging"]:
-        answers["window_minutes"] = ask_number("  How long a window to average (minutes)", defaults["window_minutes"], minimum=0, exclusive_minimum=True)
-        answers["gap_minutes"] = ask_number("  How long before the next addition should each window end (minutes)", defaults["gap_minutes"], minimum=0)
+    section_starter("Analysis")
+    fit, details = analysis_asker(summaries, answers, defaults, FITS_FOLDER, export_root)
 
-    heading("5. What to plot")
-    answers["plot_o2"] = ask_yes_no("Plot the set and measured oxygen (CsO2 and CcO2)?", defaults["plot_o2"])
-    answers["plot_ocr"] = ask_yes_no("Plot the oxygen consumption rate (OCR)?", defaults["plot_ocr"])
-    if answers["plot_ocr"]:
-        options = [("raw", "Raw OCR")]
-        if answers["normalise_od"]:
-            options.append(("od", "OCR per OD (OCR/OD)"))
-        options.append(("percent", "OCR as a % of its range (lowest to highest)"))
-        keys = [k for k, _ in options]
-        answers["ocr_mode"] = ask_choice("  Which OCR?", options, defaults["ocr_mode"] if defaults["ocr_mode"] in keys else keys[0])
-    answers["plot_haems"] = False
-    if answers["decompose"]:
-        answers["plot_haems"] = ask_yes_no("Plot the haems?", defaults["plot_haems"])
-        if answers["plot_haems"]:
-            names = list(fit["haem_list"])
-            answers["haems"] = ask_multi("  Which haems?", names, default_all=True)
-            answers["haem_mode"] = ask_choice("  Plot them as", [
-                ("abs", "Absorbance (mOD)"), ("delta", "Delta A (change in absorbance from the start, mOD)"),
-                ("conc", "Concentration"), ("percent", "% oxidised (lowest to highest = 0 to 100 %)")], defaults["haem_mode"])
-            if answers["normalise_od"] and answers["haem_mode"] != "percent":
-                answers["haem_per_od"] = ask_yes_no("  Divide the haem values by OD as well?", defaults["haem_per_od"])
-    comparison = None
-    if not (answers["plot_o2"] or answers["plot_ocr"] or answers["plot_haems"]):
-        print("  Nothing is set to be plotted, so no figures will be made.")
-    else:
-        answers["event_label_angle"] = ask_number("Angle of the event labels in degrees (0 = horizontal, 90 = vertical)",
-                                                  defaults["event_label_angle"], minimum=0, maximum=90)
-        if len(summaries) >= 2 and ask_yes_no("Also plot a comparison of two runs side by side?", False):
-            names = [(s["name"], s["name"]) for s in summaries]
-            first = ask_choice("  Which run goes on the left?", names)
-            second = ask_choice("  Which run goes on the right?", [n for n in names if n[0] != first])
-            comparison = {"runs": (first, second)}
+    section_starter("Individual experiment plots")
+    plotted = plot_asker(answers, defaults, fit)
 
-    heading("6. Special figures")
-    wants_time_response, wants_haem_ocr = custom_choice_asker(defaults)
-    if (wants_time_response or wants_haem_ocr) and fit is None:
-        print("  These figures need the haem decomposition, so it is switched on now.")
-        answers["decompose"], answers["fit_file"], fit, answers["decomposition_dataset"] = ask_decomposition(summaries, defaults, forced=True)
+    section_starter("Multi-experiment plots")
+    comparison, exemplar_names = multi_experiment_asker(summaries, answers, defaults, plotted)
 
-    heading("7. Figure size")
-    answers["journal"] = ask_choice("Paper format (journal)", [(k, v) for k, v in JOURNAL_NAMES.items()], defaults["journal"])
-    spec = settings.JOURNAL_SPECS[answers["journal"]]
-    columns = [(c, f"{c:g} column{'s' if c != 1 else ''} wide ({mm} mm)") for c, mm in spec["widths_mm"].items()]
-    answers["columns"] = ask_choice("Figure width", columns, defaults["columns"] if defaults["columns"] in spec["widths_mm"] else columns[0][0])
-    answers["height"] = ask_number(f"Figure height as a fraction of the page height (0.5 = half a page = {0.5 * spec['page_height_mm']:g} mm)",
-                                   defaults["height"], minimum=0, exclusive_minimum=True, maximum=1)
-    if comparison:
-        print("\n  The comparison figure has its own size:")
-        wide = [(c, f"{c:g} column{'s' if c != 1 else ''} wide ({mm} mm)") for c, mm in spec["widths_mm"].items()]
-        comparison["columns"] = answers["comparison_columns"] = ask_choice(
-            "Comparison figure width", wide, defaults["comparison_columns"] if defaults["comparison_columns"] in spec["widths_mm"] else wide[-1][0])
-        comparison["height"] = answers["comparison_height"] = ask_number(
-            f"Comparison figure height as a fraction of the page height (0.5 = half a page = {0.5 * spec['page_height_mm']:g} mm)",
-            defaults["comparison_height"], minimum=0, exclusive_minimum=True, maximum=1)
+    section_starter("Experiment summaries")
+    fit, custom = summary_figure_asker(names, answers, defaults, summaries, fit, FITS_FOLDER)
 
-    custom = {"time_response": None, "haem_ocr": None}
-    if wants_time_response or wants_haem_ocr:
-        heading("8. Settings of the special figures")
-        custom = custom_detail_asker([s["name"] for s in summaries], answers, defaults, fit, wants_time_response, wants_haem_ocr)
-    else:
-        answers["plot_time_response"] = answers["plot_haem_ocr"] = False
-
-    heading("9. Data export")
+    section_starter("Data export")
     print("  Every experiment always gets a workbook with CcO2, CsO2, VoO2, the events and your OD/volume/dilution entries.")
-    answers["export_full"] = ask_yes_no("Also put every processed table in it (OD-scaled, haems, percent, ...)?", defaults["export_full"])
-    answers["export_spectra"] = ask_yes_no("Also export the spectra as csv files? (large, and it takes a while)", defaults["export_spectra"])
+    answers["export_full"] = ask_yes_no("Do you want to put every processed table in the workbook (OD-scaled, haems, percent, ...)?", defaults["export_full"])
+    answers["export_spectra"] = ask_yes_no("Do you want to export the spectra as csv files (large, and it takes a while)?", defaults["export_spectra"])
 
-    heading("10. Details for each experiment")
     experiments = []
     for s in summaries:
-        info = {"path": s["path"], "name": s["name"], "trim_start": trims[s["name"]]["start"], "trim_end": trims[s["name"]]["end"],
-                "duration": s["duration_min"], "keep": bool(comparison) and s["name"] in comparison["runs"],
-                "custom": {"time_response_group": (custom["time_response"] or {}).get(s["name"]),
-                           "haem_ocr": s["name"] in (custom["haem_ocr"] or [])}}
-        info["keep"] = info["keep"] or bool(info["custom"]["time_response_group"]) or info["custom"]["haem_ocr"]
-        info.update(ask_experiment_details(s, answers, export_root))
+        name = s["name"]
+        info = {"path": s["path"], "name": name, "duration": s["duration_min"],
+                "trim_start": limits[name]["trim_start"], "trim_end": limits[name]["trim_end"],
+                "ignore_start": limits[name]["ignore_start"], "ignore_end": limits[name]["ignore_end"],
+                "custom": {"time_response_group": (custom["time_response"] or {}).get(name),
+                           "haem_ocr": name in (custom["haem_ocr"] or [])},
+                "exemplar": name in (exemplar_names or [])}
+        info["keep"] = (bool(comparison) and name in comparison["runs"]) or info["exemplar"] \
+            or bool(info["custom"]["time_response_group"]) or info["custom"]["haem_ocr"]
+        info.update(details[name])
         experiments.append(info)
 
-    heading("Summary")
+    section_starter("Summary")
     print(f"  Files:            {len(experiments)} from {folder}")
     print(f"  Results to:       {export_root}")
-    print(f"  Ignore first:     {answers['ignore_first_minutes']:g} min")
-    trimmed = [f"{k} {('from %g ' % v['start']) if v['start'] else ''}{('to %g ' % v['end']) if v['end'] else ''}min" for k, v in trims.items() if v["start"] or v["end"]]
+    spans = {}
+    for name, v in limits.items():
+        if v["trim_start"] or v["trim_end"]:
+            spans.setdefault((v["trim_start"] or 0, v["trim_end"]), []).append(name)
+    trimmed = [f"{('all files' if len(names) == len(limits) else ', '.join(names))}: "
+               f"{'from %g ' % start if start else ''}{'to %g ' % end if end else ''}min"
+               for (start, end), names in spans.items()]
     print(f"  Trimmed:          {', '.join(trimmed) or 'none'}")
+    print(f"  Ignored:          first {answers['ignore_first_minutes']:g} min, last {answers['ignore_last_minutes']:g} min (largest over the files)")
     print(f"  Decomposition:    {answers['fit_file'] if answers['decompose'] else 'no'}")
     print(f"  OD scaling:       {'yes' if answers['normalise_od'] else 'no'}")
     print(f"  Event averaging:  {'%g min window, ending %g min before the next addition' % (answers['window_minutes'], answers['gap_minutes']) if answers['averaging'] else 'no'}")
     shown = [name for name, on in (("O2", answers["plot_o2"]), (f"OCR ({answers['ocr_mode']})", answers["plot_ocr"]),
                                    (f"haems {', '.join(answers['haems'])} ({answers['haem_mode']})", answers["plot_haems"])) if on]
     print(f"  Plots:            {'; '.join(shown) or 'none'}")
+    print(f"  Individual:       {JOURNAL_NAMES[answers['journal']]}, {answers['columns']:g} column(s), height {answers['height']:g} of a page")
     if comparison:
-        print(f"  Comparison:       {comparison['runs'][0]} (a) vs {comparison['runs'][1]} (b), {comparison['columns']:g} column(s), height {comparison['height']:g} of a page")
+        print(f"  Side by side:     {comparison['runs'][0]} (a) vs {comparison['runs'][1]} (b), {JOURNAL_NAMES[answers['comparison_journal']]}, {comparison['columns']:g} column(s), height {comparison['height']:g}")
+    if exemplar_names:
+        print(f"  2x2 grid:         run {answers['ho_exemplar_run']}, {JOURNAL_NAMES[answers['ex_journal']]}, {answers['ho_ex_columns']:g} column(s), height {answers['ho_ex_height']:g}")
     if answers["plot_time_response"]:
-        print(f"  Time response:    groups {', '.join(answers['tr_groups'])}, {answers['tr_columns']:g} column(s), height {answers['tr_height']:g} of a page")
+        print(f"  Time response:    groups {', '.join(answers['tr_groups'])}, {JOURNAL_NAMES[answers['tr_journal']]}, {answers['tr_columns']:g} column(s), height {answers['tr_height']:g}")
     if answers["plot_haem_ocr"]:
-        print(f"  Haem and OCR:     publication figure + exemplar figure (run {answers['ho_exemplar_run']}), {len(custom['haem_ocr'])} file(s)")
-    print(f"  Figure:           {JOURNAL_NAMES[answers['journal']]}, {answers['columns']:g} column(s), height {answers['height']:g} of a page")
+        print(f"  Haem and OCR:     {len(custom['haem_ocr'])} file(s), {JOURNAL_NAMES[answers['ho_journal']]}, {answers['ho_pub_columns']:g} column(s), height {answers['ho_pub_height']:g}")
     print(f"  Workbooks:        {'all processed data' if answers['export_full'] else 'CcO2, CsO2, VoO2'}{' + spectra csv' if answers['export_spectra'] else ''}")
-    if not ask_yes_no("\nStart?", True):
+    if not ask_yes_no("Do you want to start?", True):
         raise UserQuit()
 
-    save_last_answers({"data_folder": str(folder), "export_folder": str(export_root),
-                       "answers": {k: v for k, v in answers.items() if k != "haems" or v}})
-    return answers, export_root, experiments, fit, comparison
+    files = dict(remembered)
+    files.update({name: dict(v) for name, v in limits.items()})
+    save_last_answers({"data_folder": str(folder), "export_folder": str(export_root), "files": files,
+                       "answers": {k: v for k, v in answers.items() if k not in ("haems", "ho_haems") or v}})
+    return answers, export_root, experiments, fit, comparison, exemplar_names
 # %% PROCESSING --------------------------------------------------------------------------------------------------------------------------------------
 
 
@@ -357,6 +178,7 @@ def process_experiment(info, cfg, fit, export_root):
     """Read, process, plot and export one .paf. Each step reports its own problem and the next step still runs."""
     a = cfg.answers
     name = info["name"]
+    ignore_first, ignore_last = info["ignore_start"], info["ignore_end"]
     print(f"\nProcessing: {name}")
     datasets = None if a["export_spectra"] else ((a["decomposition_dataset"],) if a["decompose"] else ())
     experiment = load_experiment_from_paf(info["path"], spectral_datasets=datasets, with_intensity=a["export_spectra"])
@@ -390,7 +212,7 @@ def process_experiment(info, cfg, fit, export_root):
             print("  Decomposing ...")
             decompose_experiment(experiment, fit, dataset_name=a["decomposition_dataset"], spectrum_type="attenuation",
                                  degree_of_scatter=settings.DEGREE_OF_SCATTER, haemfactor=settings.HAEM_FACTOR,
-                                 delta_exclude_first_minutes=a["ignore_first_minutes"],
+                                 delta_exclude_first_minutes=ignore_first,
                                  delta_window_seconds=settings.DELTA_ABS_WINDOW_SECONDS)
             reference = experiment["haem_delta_abs"].attrs["delta_abs_baseline"]
             print(f"  Decomposed with {a['fit_file']}; delta A reference: {reference['start_time']:.2f}-{reference['end_time']:.2f} min")
@@ -411,8 +233,8 @@ def process_experiment(info, cfg, fit, export_root):
     for needed, source_key, target_key in ((percent_haem, "haem_conc", "haem_percent"), (percent_vo2, "VoO2", "VoO2_percent")):
         if needed and source_key in experiment:
             try:
-                convert_to_percent(experiment, source_key, target_key, exclude_first_minutes=a["ignore_first_minutes"],
-                                   exclude_last_minutes=0.0, window_seconds=settings.PERCENT_AVERAGE_WINDOW_SECONDS)
+                convert_to_percent(experiment, source_key, target_key, exclude_first_minutes=ignore_first,
+                                   exclude_last_minutes=ignore_last, window_seconds=settings.PERCENT_AVERAGE_WINDOW_SECONDS)
             except (KeyError, ValueError, TypeError) as exc:
                 print(f"  {target_key} skipped: {exc}")
 
@@ -438,13 +260,14 @@ def process_experiment(info, cfg, fit, export_root):
     if a["plot_o2"] or a["plot_ocr"] or haem_panels:
         try:
             print("  Plotting ...")
-            plot_experiment(experiment, cfg.plot_config(vo2_source, haem_source if haem_panels else None), export_root)
+            plot_experiment(experiment, cfg.plot_config(vo2_source, haem_source if haem_panels else None,
+                                                        ignore_first, ignore_last), export_root)
         except Exception as exc:                                   # a figure problem must not lose the data export
             print(f"  Figure not made: {type(exc).__name__}: {exc}")
             plt.close("all")
 
     # Workbook.
-    metadata.update({"ignore_first_minutes": a["ignore_first_minutes"], "fit_file": a["fit_file"] if a["decompose"] else None,
+    metadata.update({"ignore_first_minutes": ignore_first, "ignore_last_minutes": ignore_last, "fit_file": a["fit_file"] if a["decompose"] else None,
                      "processed": datetime.now().strftime("%Y-%m-%d %H:%M")})
     print("  Exporting ...")
     export_individual_experiment(experiment, export_root, full=a["export_full"], spectra=a["export_spectra"])
@@ -463,6 +286,7 @@ def process_experiment(info, cfg, fit, export_root):
 
 
 def make_comparison(comparison, kept, cfg, export_root):
+    cfg = settings.Config(dict(cfg.answers, journal=cfg.answers["comparison_journal"]))
     """The side-by-side figure of the two chosen runs (skipped, with the reason, if either one failed or they were plotted differently)."""
     names = comparison["runs"]
     first, second = (kept.get(name) for name in names)
@@ -483,9 +307,10 @@ def make_comparison(comparison, kept, cfg, export_root):
         plt.close("all")
 
 
-def make_special_figures(kept, cfg, fit, export_root):
-    """The time response and the haem and OCR response figures (each skipped, with the reason, if it cannot be made)."""
+def make_special_figures(kept, cfg, fit, export_root, exemplar_names):
+    """The time response, haem and OCR response and 2x2 figures (each skipped, with the reason, if it cannot be made)."""
     a = cfg.answers
+    journals = {"time_response": "tr_journal", "haem_ocr": "ho_journal"}
     for key, enabled, title, runner in (("time_response", a["plot_time_response"], "Time response", time_response_runner),
                                         ("haem_ocr", a["plot_haem_ocr"], "Haem and OCR response", haem_ocr_runner)):
         if not enabled:
@@ -496,16 +321,34 @@ def make_special_figures(kept, cfg, fit, export_root):
             print(f"  Not made: only {len(prepared)} file(s) could be prepared (at least two are needed).")
             continue
         try:
-            runner(prepared, cfg, a, fit, export_root)
-        except Exception as exc:                               # one special figure must not stop the other
+            figure_cfg = settings.Config(dict(a, journal=a[journals[key]]))
+            runner(prepared, figure_cfg, a, fit, export_root)
+        except Exception as exc:                               # one special figure must not stop the others
+            print(f"  Not made: {type(exc).__name__}: {exc}")
+            print(traceback.format_exc())
+            plt.close("all")
+    if a["plot_exemplar"]:
+        print("\n2x2 figure")
+        chosen = {name: kept[name] for name in (exemplar_names or []) if name in kept}
+        if len(chosen) < 4:
+            print(f"  Not made: only {len(chosen)} of the four experiments finished.")
+            return
+        try:
+            exemplar_runner(chosen, settings.Config(dict(a, journal=a["ex_journal"])), a, fit, export_root)
+        except Exception as exc:
             print(f"  Not made: {type(exc).__name__}: {exc}")
             print(traceback.format_exc())
             plt.close("all")
 
 
 def main():
+    for stream in (sys.stdout, sys.stderr):
+        try:
+            stream.reconfigure(errors="replace")      # symbols such as the delta never stop the program
+        except (AttributeError, ValueError):
+            pass
     try:
-        answers, export_root, experiments, fit, comparison = ask_everything()
+        answers, export_root, experiments, fit, comparison, exemplar_names = ask_everything()
     except (UserQuit, KeyboardInterrupt):
         print("\nCancelled. Nothing was changed.")
         return 1
@@ -535,7 +378,7 @@ def main():
                 gc.collect()
         if comparison:
             make_comparison(comparison, kept, cfg, export_root)
-        make_special_figures(kept, cfg, fit, export_root)
+        make_special_figures(kept, cfg, fit, export_root, exemplar_names)
         minutes, seconds = divmod(time.perf_counter() - start, 60)
         print(f"\nFinished {len(experiments) - len(failed)} of {len(experiments)} file(s) in {int(minutes)} min {seconds:.0f} s.")
         if failed:
