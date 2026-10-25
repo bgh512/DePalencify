@@ -1,8 +1,12 @@
 """Settings dictionaries of the custom figures, built from the terminal answers."""
-from config import Config, haem_colours
-from utils_shared.figure_layout import figure_size_inches
-from utils_shared.helpers import simplify_name
 
+# ---- LOCAL IMPORTS -------------------------------------------------------------------
+from config import Config, haem_colour_mapper
+from utils_shared.figure_layout import figure_size_calculator
+from utils_shared.helpers import name_simplifier
+
+
+# ---- CONSTANTS -----------------------------------------------------------------------
 HAEM_LABELS = {'cyta605': '$a_{605}$',
                'cytcc': '$cc$',
                'cytc1': '$c_1$',
@@ -29,8 +33,80 @@ DELTA_A_OD_LABEL = '$\\Delta$A (mOD OD$^{-1}$)'
 HAEM_ABS_OD_LABEL = 'Haem absorbance (mOD OD$^{-1}$)'
 
 
-# ---- HAEM LABELLER -------------------------------------------------------------------
+# ---- MAIN FUNCTIONS ------------------------------------------------------------------
 
+
+# ---- EXEMPLAR CONFIG BUILDER ---------------------------------------------------------
+def exemplar_config_builder(cfg: Config, answers: dict) -> dict:
+    """
+    ---- Summary ----
+    Main function to build the settings of the four-run exemplar figure.
+
+    ---- Inputs ----
+    cfg : Config
+        Figure style derived from the answers (config.py).
+    answers : dict
+        Terminal answers; uses ho_exemplar_run, ho_ex_columns and ho_ex_height.
+
+    ---- Globals read ----
+    ORDER_COLUMNS, STRAIN_ROWS, SAVE_FORMATS, OUTPUT_SUBFOLDER.
+
+    ---- Outputs ----
+    dict
+        Settings for exemplar_figure_plotter and publication_figure_saver.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    figure_size_calculator
+    """
+
+    # ---- 1 Read the style and size ---------------------------------------------------
+    style, fonts, unit, spec = cfg.STYLE, cfg.FONTS, cfg.UNIT, cfg.SPEC
+    size = figure_size_calculator(spec,
+                                  answers['ho_ex_columns'],
+                                  answers['ho_ex_height'],
+                                  )
+
+    # ---- 2 Build the configuration ---------------------------------------------------
+    return {'SAVE_FIGURE': True,
+            'SAVE_FORMATS': SAVE_FORMATS,
+            'OUTPUT_SUBFOLDER': OUTPUT_SUBFOLDER,
+            'FILE_NAME': 'exemplar_figure',
+            'ORDER_COLUMNS': ORDER_COLUMNS,
+            'STRAIN_ROWS': STRAIN_ROWS,
+            'EXEMPLAR_RUN': answers['ho_exemplar_run'],
+            'CROP_START': 'baseline',
+            'CROP_MARGIN_MINUTES': 0.0,
+            'CROP_BEFORE_FIRST_ADDITION_MINUTES': 0.5,
+            'TIME_AXIS_LABEL': 'Time from baseline (min)',
+            'RUN_NAME_WATERMARK': True,
+            'INDIVIDUAL_OVERRIDES': {'PANEL_HEIGHT_RATIOS': {'oxygen': 3,
+                                                             'vo2': 4,
+                                                             'haem': 5,
+                                                             },
+                                     'EVENT_LABEL_ROTATION': 30,
+                                     'LEGEND_LOCATIONS': {'oxygen': 'center right'},
+                                     },
+            'FIGURE_SIZE': size,
+            'FIGURE_DPI': cfg.FIGURE_DPI,
+            'TIGHT_BBOX': False,
+            'FIGURE_TITLE': None,
+            'SUPTITLE_FONT_SIZE': fonts['title'],
+            'UNIT_PT': unit,
+            'EDGE_PAD_PT': style['edge_pad'],
+            'TITLE_GAP_PT': style['title_gap'],
+            'PANEL_LETTERS': True,
+            'PANEL_LETTER_CASE': spec['panel_letter_case'],
+            'PANEL_LETTER_FONT_SIZE': fonts['panel_letter'],
+            }
+
+
+# ---- HAEM LABELLER -------------------------------------------------------------------
 def haem_labeller(haem_name: str) -> str:
     """
     ---- Summary ----
@@ -52,51 +128,74 @@ def haem_labeller(haem_name: str) -> str:
 
     ---- Equations ----
     None.
+
+    ---- Helpers ----
+    name_simplifier
     """
-    return HAEM_LABELS.get(simplify_name(haem_name), haem_name)
+
+    return HAEM_LABELS.get(name_simplifier(haem_name), haem_name)
 
 
-# ---- SOURCE SELECTOR -----------------------------------------------------------------
-
-def source_selector(answers: dict, od_available: bool) -> tuple:
+# ---- INDIVIDUAL CONFIG BUILDER -------------------------------------------------------
+def individual_config_builder(answers: dict,
+                              vo2_source: str,
+                              haem_source: str,
+                              haem_names: list,
+                              ) -> dict:
     """
     ---- Summary ----
-    Main function to choose the OCR and haem data sources of the haem and OCR response
-    figures from the answers.
+    Main function to build the individual-experiment plot settings used inside the
+    custom figures: oxygen, OCR and one panel per chosen haem.
 
     ---- Inputs ----
     answers : dict
-        Terminal answers; uses ho_ocr_mode ('raw' or 'od'), ho_haem_mode ('delta',
-        'abs' or 'conc') and ho_per_od.
-    od_available : bool
-        True when the experiment has OD, volume and dilution factor.
+        Terminal answers (journal, size and label angle are taken from them).
+    vo2_source : str
+        OCR source plotted: 'raw' or 'od'.
+    haem_source : str
+        Haem source plotted, for example 'delta_abs_od'.
+    haem_names : list
+        Haem names, in panel order, matching the decomposition columns.
 
     ---- Globals read ----
     None.
 
     ---- Outputs ----
-    tuple
-        (vo2_source, haem_source) as used by the averaging and plotting code, for
-        example ('od', 'delta_abs_od'). OD sources are only chosen when od_available.
+    dict
+        Plot settings in the format of Config.plot_config.
 
     ---- Globals mutated ----
     None.
 
     ---- Equations ----
     None.
+
+    ---- Helpers ----
+    plot_config_builder
     """
-    pairs = {'conc': ('raw', 'od'),
-             'abs': ('abs', 'abs_od'),
-             'delta': ('delta_abs', 'delta_abs_od'),
-             }
-    raw_haem, od_haem = pairs[answers['ho_haem_mode']]
-    use_od = od_available and answers['ho_per_od']
-    vo2_source = 'od' if (od_available and answers['ho_ocr_mode'] == 'od') else 'raw'
-    return vo2_source, (od_haem if use_od else raw_haem)
+
+    # ---- 1 Merge the answers ---------------------------------------------------------
+    merged = dict(answers,
+                  plot_o2=True,
+                  plot_ocr=True,
+                  plot_haems=True,
+                  decompose=True,
+                  averaging=True,
+                  haems=list(haem_names),
+                  ocr_mode=vo2_source,
+                  )
+
+    # ---- 2 Build the individual configuration ----------------------------------------
+    individual = Config(merged).plot_config_builder(vo2_source, haem_source)
+
+    # ---- 3 Set the haem axis labels --------------------------------------------------
+    individual['HAEM_AXIS_LABELS'] = dict(individual['HAEM_AXIS_LABELS'],
+                                          **HAEM_AXIS_LABELS,
+                                          )
+    return individual
 
 
 # ---- PUBLICATION CONFIG BUILDER ------------------------------------------------------
-
 def publication_config_builder(cfg: Config, answers: dict, haem_names: list) -> dict:
     """
     ---- Summary ----
@@ -122,16 +221,20 @@ def publication_config_builder(cfg: Config, answers: dict, haem_names: list) -> 
 
     ---- Equations ----
     None.
+
+    ---- Helpers ----
+    figure_size_calculator
+    haem_labeller
     """
 
-    # ---- 1 Gather the style values -------------------------------------------
+    # ---- 1 Gather the style values ---------------------------------------------------
     style, fonts, unit, spec = cfg.STYLE, cfg.FONTS, cfg.UNIT, cfg.SPEC
-    size = figure_size_inches(spec,
-                              answers['ho_pub_columns'],
-                              answers['ho_pub_height'],
-                              )
+    size = figure_size_calculator(spec,
+                                  answers['ho_pub_columns'],
+                                  answers['ho_pub_height'],
+                                  )
 
-    # ---- 2 Build the settings ------------------------------------------------
+    # ---- 2 Build the settings --------------------------------------------------------
     rows = [{'haem': name, 'label': haem_labeller(name)} for name in haem_names]
     return ({'SAVE_FIGURE': True,
              'SAVE_FORMATS': SAVE_FORMATS,
@@ -209,69 +312,49 @@ def publication_config_builder(cfg: Config, answers: dict, haem_names: list) -> 
             )
 
 
-# ---- EXEMPLAR CONFIG BUILDER ---------------------------------------------------------
-
-def exemplar_config_builder(cfg: Config, answers: dict) -> dict:
+# ---- SOURCE SELECTOR -----------------------------------------------------------------
+def source_selector(answers: dict, od_available: bool) -> tuple:
     """
     ---- Summary ----
-    Main function to build the settings of the four-run exemplar figure.
+    Main function to choose the OCR and haem data sources of the haem and OCR response
+    figures from the answers.
 
     ---- Inputs ----
-    cfg : Config
-        Figure style derived from the answers (config.py).
     answers : dict
-        Terminal answers; uses ho_exemplar_run, ho_ex_columns and ho_ex_height.
+        Terminal answers; uses ho_ocr_mode ('raw' or 'od'), ho_haem_mode ('delta',
+        'abs' or 'conc') and ho_per_od.
+    od_available : bool
+        True when the experiment has OD, volume and dilution factor.
 
     ---- Globals read ----
-    ORDER_COLUMNS, STRAIN_ROWS, SAVE_FORMATS, OUTPUT_SUBFOLDER.
+    None.
 
     ---- Outputs ----
-    dict
-        Settings for exemplar_figure_plotter and publication_figure_saver.
+    tuple
+        (vo2_source, haem_source) as used by the averaging and plotting code, for
+        example ('od', 'delta_abs_od'). OD sources are only chosen when od_available.
 
     ---- Globals mutated ----
     None.
 
     ---- Equations ----
     None.
+
+    ---- Helpers ----
+    None.
     """
-    style, fonts, unit, spec = cfg.STYLE, cfg.FONTS, cfg.UNIT, cfg.SPEC
-    size = figure_size_inches(spec, answers['ho_ex_columns'], answers['ho_ex_height'],)
-    return {'SAVE_FIGURE': True,
-            'SAVE_FORMATS': SAVE_FORMATS,
-            'OUTPUT_SUBFOLDER': OUTPUT_SUBFOLDER,
-            'FILE_NAME': 'exemplar_figure',
-            'ORDER_COLUMNS': ORDER_COLUMNS,
-            'STRAIN_ROWS': STRAIN_ROWS,
-            'EXEMPLAR_RUN': answers['ho_exemplar_run'],
-            'CROP_START': 'baseline',
-            'CROP_MARGIN_MINUTES': 0.0,
-            'CROP_BEFORE_FIRST_ADDITION_MINUTES': 0.5,
-            'TIME_AXIS_LABEL': 'Time from baseline (min)',
-            'RUN_NAME_WATERMARK': True,
-            'INDIVIDUAL_OVERRIDES': {'PANEL_HEIGHT_RATIOS': {'oxygen': 3,
-                                                             'vo2': 4,
-                                                             'haem': 5,
-                                                             },
-                                     'EVENT_LABEL_ROTATION': 30,
-                                     'LEGEND_LOCATIONS': {'oxygen': 'center right'},
-                                     },
-            'FIGURE_SIZE': size,
-            'FIGURE_DPI': cfg.FIGURE_DPI,
-            'TIGHT_BBOX': False,
-            'FIGURE_TITLE': None,
-            'SUPTITLE_FONT_SIZE': fonts['title'],
-            'UNIT_PT': unit,
-            'EDGE_PAD_PT': style['edge_pad'],
-            'TITLE_GAP_PT': style['title_gap'],
-            'PANEL_LETTERS': True,
-            'PANEL_LETTER_CASE': spec['panel_letter_case'],
-            'PANEL_LETTER_FONT_SIZE': fonts['panel_letter'],
-            }
+
+    pairs = {'conc': ('raw', 'od'),
+             'abs': ('abs', 'abs_od'),
+             'delta': ('delta_abs', 'delta_abs_od'),
+             }
+    raw_haem, od_haem = pairs[answers['ho_haem_mode']]
+    use_od = od_available and answers['ho_per_od']
+    vo2_source = 'od' if (od_available and answers['ho_ocr_mode'] == 'od') else 'raw'
+    return vo2_source, (od_haem if use_od else raw_haem)
 
 
 # ---- TIME RESPONSE CONFIG BUILDER ----------------------------------------------------
-
 def time_response_config_builder(cfg: Config, answers: dict, haem_names: list,) -> dict:
     """
     ---- Summary ----
@@ -298,10 +381,18 @@ def time_response_config_builder(cfg: Config, answers: dict, haem_names: list,) 
 
     ---- Equations ----
     None.
+
+    ---- Helpers ----
+    figure_size_calculator
+    haem_colour_mapper
     """
+
+    # ---- 1 Read the style and size ---------------------------------------------------
     style, fonts, unit, spec = cfg.STYLE, cfg.FONTS, cfg.UNIT, cfg.SPEC
-    size = figure_size_inches(spec, answers['tr_columns'], answers['tr_height'],)
+    size = figure_size_calculator(spec, answers['tr_columns'], answers['tr_height'],)
     groups = tuple(answers['tr_groups'])
+
+    # ---- 2 Build the configuration ---------------------------------------------------
     return {'SAVE_FIGURE': True,
             'SAVE_FORMATS': SAVE_FORMATS,
             'OUTPUT_SUBFOLDER': OUTPUT_SUBFOLDER,
@@ -353,7 +444,7 @@ def time_response_config_builder(cfg: Config, answers: dict, haem_names: list,) 
             'WATERFALL_SHARE_X_AXIS': True,
             'DECOMPOSITION_Y_LABEL': 'Difference attenuation',
             'DECOMPOSITION_LEGEND_LOCATION': 'upper right',
-            'HAEM_COLOURS': haem_colours(haem_names),
+            'HAEM_COLOURS': haem_colour_mapper(haem_names),
             'TICK_FONT_SIZE': fonts['tick'],
             'AXIS_LABEL_FONT_SIZE': fonts['label'],
             'TITLE_FONT_SIZE': fonts['title'],
@@ -365,54 +456,3 @@ def time_response_config_builder(cfg: Config, answers: dict, haem_names: list,) 
             'LEGEND_COLUMNS': 1,
             'LEGEND_FRAME': True,
             }
-
-
-# ---- INDIVIDUAL CONFIG BUILDER -------------------------------------------------------
-
-def individual_config_builder(answers: dict,
-                              vo2_source: str,
-                              haem_source: str,
-                              haem_names: list,
-                              ) -> dict:
-    """
-    ---- Summary ----
-    Main function to build the individual-experiment plot settings used inside the
-    custom figures: oxygen, OCR and one panel per chosen haem.
-
-    ---- Inputs ----
-    answers : dict
-        Terminal answers (journal, size and label angle are taken from them).
-    vo2_source : str
-        OCR source plotted: 'raw' or 'od'.
-    haem_source : str
-        Haem source plotted, for example 'delta_abs_od'.
-    haem_names : list
-        Haem names, in panel order, matching the decomposition columns.
-
-    ---- Globals read ----
-    None.
-
-    ---- Outputs ----
-    dict
-        Plot settings in the format of Config.plot_config.
-
-    ---- Globals mutated ----
-    None.
-
-    ---- Equations ----
-    None.
-    """
-    merged = dict(answers,
-                  plot_o2=True,
-                  plot_ocr=True,
-                  plot_haems=True,
-                  decompose=True,
-                  averaging=True,
-                  haems=list(haem_names),
-                  ocr_mode=vo2_source,
-                  )
-    individual = Config(merged).plot_config(vo2_source, haem_source)
-    individual['HAEM_AXIS_LABELS'] = dict(individual['HAEM_AXIS_LABELS'],
-                                          **HAEM_AXIS_LABELS,
-                                          )
-    return individual

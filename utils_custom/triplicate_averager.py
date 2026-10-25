@@ -1,12 +1,19 @@
 """Across-run (triplicate) statistics of the event-window averages."""
+
+# ---- STANDARD IMPORTS ----------------------------------------------------------------
 from typing import Iterable
+
+# ---- 3RD PARTY IMPORTS ---------------------------------------------------------------
 import numpy as np
 
+# ---- LOCAL IMPORTS -------------------------------------------------------------------
 from utils_custom.run_namer import condition_grouper
 
 
-# ---- RUN SUMMARISER ------------------------------------------------------------------
+# ---- TRIPLICATE AVERAGER HELPERS -----------------------------------------------------
 
+
+# ---- _RUN SUMMARISER -----------------------------------------------------------------
 def _run_summariser(values: Iterable) -> tuple:
     """
     ---- Summary ----
@@ -29,7 +36,11 @@ def _run_summariser(values: Iterable) -> tuple:
 
     ---- Equations ----
     SD = sqrt(sum((x - mean)^2) / (N - 1)); SEM = SD / sqrt(N).
+
+    ---- Helpers ----
+    None.
     """
+
     numbers = np.asarray(list(values), dtype=float)
     numbers = numbers[np.isfinite(numbers)]
     n = len(numbers)
@@ -42,8 +53,7 @@ def _run_summariser(values: Iterable) -> tuple:
     return mean, sd, sd / np.sqrt(n), n
 
 
-# ---- WINDOW SORTER -------------------------------------------------------------------
-
+# ---- _WINDOW SORTER ------------------------------------------------------------------
 def _window_sorter(window_name: str) -> int:
     """
     ---- Summary ----
@@ -65,13 +75,18 @@ def _window_sorter(window_name: str) -> int:
 
     ---- Equations ----
     None.
+
+    ---- Helpers ----
+    None.
     """
 
     return int(window_name[len('average'):])
 
 
-# ---- TRIPLICATE AVERAGER -------------------------------------------------------------
+# ---- MAIN FUNCTIONS ------------------------------------------------------------------
 
+
+# ---- TRIPLICATE AVERAGER -------------------------------------------------------------
 def triplicate_averager(experiments: dict, min_runs: int = 2) -> dict:
     """
     ---- Summary ----
@@ -97,22 +112,32 @@ def triplicate_averager(experiments: dict, min_runs: int = 2) -> dict:
 
     ---- Equations ----
     None.
+
+    ---- Helpers ----
+    _run_summariser
+    _run_value_getter
+    _window_sorter
+    condition_grouper
     """
+
+    # ---- 1 Prepare the results -------------------------------------------------------
     results = {}
 
+    # ---- 2 Average each condition ----------------------------------------------------
     for condition, runs in sorted(condition_grouper(experiments).items()):
+        # ---- 2.1 Select the usable runs ----------------------------------------------
         usable = {run: exp for run, exp in sorted(runs.items()) if exp.get('averages')}
         if len(usable) < min_runs:
             print(f'  Skipping {condition}: fewer than {min_runs} runs with averages.')
             continue
 
+        # ---- 2.2 Collect the window times --------------------------------------------
         windows_by_run = {run: exp['averages']['windows'] for run, exp in usable.items()
                           }
         window_names = sorted({w for windows in windows_by_run.values() for w in windows
                                },
                               key=_window_sorter,
                               )
-
         window_times = {}
         for window_name in window_names:
             for windows in windows_by_run.values():
@@ -122,6 +147,7 @@ def triplicate_averager(experiments: dict, min_runs: int = 2) -> dict:
                                                  )
                     break
 
+        # ---- 2.3 Start the result ----------------------------------------------------
         result = {'runs': {run: exp['experiment_name'] for run, exp in usable.items()},
                   'run_numbers': list(usable),
                   'windows': window_names,
@@ -129,6 +155,7 @@ def triplicate_averager(experiments: dict, min_runs: int = 2) -> dict:
                   'settings': next(iter(usable.values()))['averages']['settings'],
                   }
 
+        # ---- 2.4 Average each measurement kind ---------------------------------------
         for kind in ('vo2', 'haem'):
             measurements = list(dict.fromkeys(m
                                               for windows in windows_by_run.values()
@@ -162,6 +189,9 @@ def triplicate_averager(experiments: dict, min_runs: int = 2) -> dict:
 
                         ---- Equations ----
                         None.
+
+                        ---- Helpers ----
+                        None.
                         """
 
                         return {run: windows[window_name][kind].get(measurement,
@@ -171,7 +201,6 @@ def triplicate_averager(experiments: dict, min_runs: int = 2) -> dict:
                                 else np.nan
                                 for run, windows in windows_by_run.items()
                                 }
-
                     run_means, run_sds, run_changes = (_run_value_getter('mean'),
                                                        _run_value_getter('sd'),
                                                        _run_value_getter('change'),
@@ -199,6 +228,6 @@ def triplicate_averager(experiments: dict, min_runs: int = 2) -> dict:
                                   }
                     result[kind][measurement][window_name] = statistics
 
+        # ---- 2.5 Store the result ----------------------------------------------------
         results[condition] = result
-
     return results

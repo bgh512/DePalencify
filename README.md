@@ -63,7 +63,44 @@ Files whose names do not fit are listed and left out of that figure only.
 - `fits/` haem fit CSVs (your own fit goes here)
 - `FUNCTION_LIST.md`, `DATA_FORMAT.md`, `CODING_STYLE.md` project documentation
 
+## Installation
+
+Download the program from GitHub (needs [git](https://git-scm.com/) and Python 3.9 or newer):
+
+```
+git clone https://github.com/bgh512/DePalencify.git
+cd DePalencify
+git checkout dev
+```
+
+Without git, use the green **Code > Download ZIP** button on
+https://github.com/bgh512/DePalencify and unzip it. To update later, run
+`git pull` inside the folder (the launchers also check for updates).
+
 ## Requirements
 
 Python 3.9 or newer with numpy, pandas, scipy, matplotlib and openpyxl. The
-launchers install what is missing.
+launchers install what is missing; to install by hand run
+`pip install numpy pandas scipy matplotlib openpyxl`.
+
+## Running
+
+- Windows: double-click `run.bat`
+- Mac: double-click `run.command`
+- Linux / Mac terminal: `./run.sh`
+
+Or directly: `python DePalencify.py`. Answer the numbered questions; Enter accepts
+the [default].
+
+## Outputs
+
+In the results folder you chose, one sub-folder per run holds, for every `.paf` file:
+
+- one figure per experiment (`.svg` and `.png`, sized for the chosen journal)
+- one Excel workbook per experiment (CcO2, CsO2, VoO2, events and metadata sheets;
+  optionally everything and the spectra)
+- the comparison, time-response and haem/OCR figures if you asked for them
+- a log file of the run
+
+The OD, volume, dilution factor and event labels you type are saved in each
+workbook and offered again next time.

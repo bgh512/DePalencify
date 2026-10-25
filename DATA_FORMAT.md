@@ -2,7 +2,7 @@
 
 ## Experiment dict (one per .paf)
 
-Produced by `utils_shared/paf_reader.load_experiment_from_paf`, then extended by
+Produced by `utils_shared/paf_reader.experiment_paf_loader`, then extended by
 the processing steps.
 
 | key | type | meaning |
