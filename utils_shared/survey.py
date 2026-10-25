@@ -197,7 +197,36 @@ def paf_finder(folder: Path) -> List[Path]:
     files = [p for p in Path(folder).iterdir()
              if p.is_file() and p.suffix.lower() == '.paf'
              ]
-    return sorted(files, key=lambda p: p.name.lower())
+    return sorted(files, key=lambda p: _natural_sorter(p.name))
+
+
+# ---- NATURAL SORTER ------------------------------------------------------------------
+
+def _natural_sorter(name: str) -> list:
+    """
+    ---- Summary ----
+    Helper function to build a sort key that puts numbers in numerical order, so
+    'control_7hours' comes before 'control_24hours'.
+
+    ---- Inputs ----
+    name : str
+        File or experiment name.
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    list
+        Key of alternating lower-case text and integer parts (text first).
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    None.
+    """
+    parts = re.split(r'(\d+)', name.lower())
+    return [int(part) if part.isdigit() else part for part in parts]
 
 
 # ---- FILES ASKER ---------------------------------------------------------------------

@@ -9,7 +9,7 @@ import re
 import sys
 from typing import Callable, List, Optional, Sequence, Tuple
 
-COLOUR_QUESTION = '\x1b[1;36m'      # bold cyan
+COLOUR_QUESTION = '\x1b[1;38;5;213m'   # bold pink
 COLOUR_SECTION = '\x1b[1;33m'       # bold yellow
 ITALIC = '\x1b[3m'
 RESET = '\x1b[0m'
