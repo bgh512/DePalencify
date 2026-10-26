@@ -62,6 +62,7 @@ from utils_shared.run_logging import logging_starter, logging_stopper
 from utils_shared.spectral_decomposer import experiment_decomposer
 from utils_shared.survey import (analysis_asker,
                                  files_asker,
+                                 haem_name_formatter,
                                  JOURNAL_NAMES,
                                  multi_experiment_asker,
                                  plot_asker,
@@ -155,7 +156,7 @@ def comparison_maker(comparison: dict,
                                          size,
                                          cfg.SPEC,
                                          )
-        print(f'  Saved comparison/{stem} ({size[0] * 25.4:.0f} x {size[1] * 25.4:.0f}'
+        print(f'  Saved {stem} ({size[0] * 25.4:.0f} x {size[1] * 25.4:.0f}'
               f' mm)',
               )
     except Exception as exc:
@@ -248,6 +249,7 @@ def everything_asker() -> Tuple[dict,
     ---- Helpers ----
     analysis_asker
     files_asker
+    haem_name_formatter
     last_answers_loader
     last_answers_saver
     multi_experiment_asker
@@ -368,22 +370,31 @@ def everything_asker() -> Tuple[dict,
                for (start, end), names in spans.items()
                ]
     print(f"  Trimmed:          {', '.join(trimmed) or 'none'}")
-    print(f"  Ignored:          first {answers['ignore_first_minutes']:g} min, last "
-          f"{answers['ignore_last_minutes']:g} min (largest over the files)",
-          )
+    ignore_spans = {}
+    for name, v in limits.items():
+        ignore_spans.setdefault((v['ignore_start'] or 0, v['ignore_end'] or 0),
+                                [],
+                                ).append(name)
+    ignored = [f"{('all files' if len(names) == len(limits) else ', '.join(names))}: "
+               f'first {start:g} min, last {end:g} min'
+               for (start, end), names in ignore_spans.items()
+               ]
+    print(f"  Ignored:          {'; '.join(ignored) or 'none'}")
     print(f'  Decomposition:    '
           f"{answers['fit_file'] if answers['decompose'] else 'no'}",
           )
     print(f"  OD scaling:       {'yes' if answers['normalise_od'] else 'no'}")
-    print(f'  Event averaging:  '
-          f"{'%g min window, ending %g min before the next addition' %
-          (answers['window_minutes'], answers['gap_minutes']) if answers['averaging']
-          else 'no'}",
-          )
+    averaging_text = 'no'
+    if answers['averaging']:
+        averaging_text = ('%g min window, ending %g min before the next addition'
+                          % (answers['window_minutes'], answers['gap_minutes'])
+                          )
+    print(f'  Event averaging:  {averaging_text}')
+    haem_names = [haem_name_formatter(name) for name in answers['haems']]
     shown = [name
              for name, on in (('O2', answers['plot_o2']),
                               (f"OCR ({answers['ocr_mode']})", answers['plot_ocr']),
-                              (f"haems {', '.join(answers['haems'])} ("
+                              (f"haems {', '.join(haem_names)} ("
                                f"{answers['haem_mode']})",
                                answers['plot_haems'],
                                ),

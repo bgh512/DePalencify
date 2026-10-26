@@ -418,6 +418,58 @@ def _panel_builder(experiment: dict,
     return panels
 
 
+# ---- _VO2 YMAX CALCULATOR ------------------------------------------------------------
+def _vo2_ymax_calculator(y: np.ndarray,
+                         window_fraction: float,
+                         headroom: float,
+                         ) -> float:
+    """
+    ---- Summary ----
+    Helper function to choose the top of the OCR axis so that the whole run is shown
+    (including the start) while a narrow spike, such as the one when dithionite is
+    added, does not stretch the axis.
+
+    ---- Inputs ----
+    y : np.ndarray
+        OCR values of the whole run (NaN allowed).
+    window_fraction : float
+        Width of the rolling median as a fraction of the number of points; spikes
+        narrower than half of it are removed from the envelope.
+    headroom : float
+        Fraction of the envelope height added above the highest smoothed value.
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    float
+        Top of the axis; NaN when there are no finite values.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    smooth = rolling median of y (window = window_fraction x n points, at least 5);
+    noise = 95th percentile of |y - smooth|;
+    top = max(smooth) + noise + headroom x max(smooth).
+
+    ---- Helpers ----
+    None.
+    """
+
+    # ---- 1 Smooth away the spikes ----------------------------------------------------
+    values = pd.Series(np.asarray(y, dtype=float))
+    if not np.isfinite(values).any():
+        return float('nan')
+    window = max(5, int(round(window_fraction * len(values))))
+    smooth = values.rolling(window, center=True, min_periods=1).median()
+
+    # ---- 2 Add the noise and the headroom --------------------------------------------
+    noise = float(np.nanpercentile(np.abs(values - smooth), 95))
+    top = float(np.nanmax(smooth))
+    return top + noise + headroom * max(top, 0.0)
+
+
 # ---- _WINDOW DRAWER ------------------------------------------------------------------
 def _window_drawer(axes: List[Axes], experiment: dict, config: dict) -> None:
     """
@@ -714,13 +766,11 @@ def experiment_drawer(fig: Figure,
             ax.set_ylabel(vo2_label, labelpad=config['Y_LABEL_PAD'])
             _min_ticks_setter(ax.yaxis, config['VO2_Y_NUM_TICKS'])
             y_max = config['VO2_Y_MAX']
-            if config['VO2_Y_PERCENTILE_MAX'] is not None and np.isfinite(y).any():
-                first_limit = np.nanmin(t) + config['Y_SCALE_IGNORE_FIRST_MINUTES']
-                last_limit = (np.nanmax(t) -
-                              config.get('Y_SCALE_IGNORE_LAST_MINUTES', 0.0))
-                keep = (np.isfinite(y) & (t >= first_limit) & (t <= last_limit))
-                if keep.any():
-                    y_max = np.percentile(y[keep], config['VO2_Y_PERCENTILE_MAX'])
+            if y_max is None and np.isfinite(y).any():
+                y_max = _vo2_ymax_calculator(y,
+                                             config['VO2_Y_SPIKE_WINDOW_FRACTION'],
+                                             config['VO2_Y_HEADROOM'],
+                                             )
             ax.set_ylim(config['VO2_Y_MIN'], y_max)
         else:  # haem
             t = time_getter(haem_data)

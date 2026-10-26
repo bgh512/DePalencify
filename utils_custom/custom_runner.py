@@ -10,9 +10,9 @@ import matplotlib.pyplot as plt
 # ---- LOCAL IMPORTS -------------------------------------------------------------------
 import config as settings
 from config import Config
-from utils_custom.custom_config import (exemplar_config_builder,
+from utils_custom.custom_config import (DATA_SUBFOLDER,
+                                        exemplar_config_builder,
                                         individual_config_builder,
-                                        OUTPUT_SUBFOLDER,
                                         publication_config_builder,
                                         source_selector,
                                         time_response_config_builder,
@@ -194,7 +194,7 @@ def exemplar_runner(chosen: dict,
         Results folder.
 
     ---- Globals read ----
-    custom_config.OUTPUT_SUBFOLDER.
+    custom_config.OUTPUT_SUBFOLDER, custom_config.DATA_SUBFOLDER.
 
     ---- Outputs ----
     None
@@ -333,7 +333,7 @@ def haem_ocr_runner(experiments: dict,
         Results folder.
 
     ---- Globals read ----
-    custom_config.OUTPUT_SUBFOLDER.
+    custom_config.OUTPUT_SUBFOLDER, custom_config.DATA_SUBFOLDER.
 
     ---- Outputs ----
     None
@@ -358,7 +358,7 @@ def haem_ocr_runner(experiments: dict,
     if not triplicates:
         print('  Not made: every condition needs at least two runs with averages.')
         return
-    workbook = Path(export_root) / OUTPUT_SUBFOLDER / 'triplicate_summary.xlsx'
+    workbook = Path(export_root) / DATA_SUBFOLDER / 'triplicate_summary.xlsx'
     triplicate_exporter(triplicates, workbook)
 
     # ---- 2 Publication figure --------------------------------------------------------
@@ -399,7 +399,7 @@ def time_response_runner(experiments: dict,
         Results folder.
 
     ---- Globals read ----
-    custom_config.OUTPUT_SUBFOLDER.
+    custom_config.OUTPUT_SUBFOLDER, custom_config.DATA_SUBFOLDER.
 
     ---- Outputs ----
     None
@@ -430,7 +430,7 @@ def time_response_runner(experiments: dict,
     config = time_response_config_builder(cfg, answers, haem_names)
 
     # ---- 2 Export the summary tables -------------------------------------------------
-    folder = Path(export_root) / config['OUTPUT_SUBFOLDER']
+    folder = Path(export_root) / config['DATA_SUBFOLDER']
     time_response_exporter(experiments, folder, config['TIME_LABEL_FORMAT'])
 
     # ---- 3 Draw and save the figure --------------------------------------------------

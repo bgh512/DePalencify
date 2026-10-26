@@ -151,7 +151,7 @@ def comparison_figure_plotter(first: dict,
         File stem of the saved figure.
 
     ---- Globals mutated ----
-    None. Writes <export_root>/comparison/<stem>.svg and .png (side effect); the figure
+    None. Writes <export_root>/<stem>.svg and .png (side effect); the figure
     is closed before returning.
 
     ---- Equations ----
@@ -219,7 +219,7 @@ def comparison_figure_plotter(first: dict,
                                    f"{second['experiment_name']}",
                                    )
         figure_saver(fig,
-                     Path(export_root) / 'comparison',
+                     Path(export_root),
                      stem,
                      ('svg', 'png'),
                      figure_size,

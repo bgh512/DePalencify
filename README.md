@@ -39,19 +39,19 @@ choosing either one switches the decomposition on.
 File names need a group word and the hours: `control_7hours`,
 `knockdown_24hours`. Spectra are averaged in the event windows, the last two
 windows are subtracted (penultimate minus final), and that difference spectrum is
-decomposed into haems. Output: `publication_figure/time_response_figure.*`,
-`<group>_difference_spectra.csv`, `<group>_haem_percentages.csv`.
+decomposed into haems. Output: `time_response_figure.*` in the results folder and
+`<group>_difference_spectra.csv`, `<group>_haem_percentages.csv` in `triplicate_data/`.
 
 ### Haem and OCR response
 File names need strain, addition order and run: `knockdown_kcn_then_bd_run1`,
 `control_bd_then_kcn_run2`. Runs of one condition are combined (mean, SEM,
-Student t-tests with Holm correction). Output in `publication_figure/`:
-`publication_figure.*` (baseline OCR bars, OCR response, haem response) and
-`triplicate_summary.xlsx`. The averaging windows are those of section 3.
+Student t-tests with Holm correction). Output: `publication_figure.*` (baseline OCR
+bars, OCR response, haem response) in the results folder, and
+`triplicate_summary.xlsx` and the t-test table in `triplicate_data/`. The averaging windows are those of section 3.
 
 ### Four experiments in a 2x2 grid (section 5)
 One run of each strain and addition order, drawn like the individual figures:
-`exemplar_figure.*` in `publication_figure/`.
+`exemplar_figure.*` in the results folder.
 
 Files whose names do not fit are listed and left out of that figure only.
 

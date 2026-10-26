@@ -70,6 +70,7 @@ Generated from the source. Names starting with `_` are private helpers.
 - `_height_ratio_calculator`: Helper function to calculate the relative panel heights from PANEL_HEIGHT_RATIOS.
 - `_min_ticks_setter`: Helper function to make sure an axis has at least a given number of ticks, still at round values.
 - `_panel_builder`: Helper function to list the panels to draw: oxygen, VO2, then one for each configured haem panel with matching data.
+- `_vo2_ymax_calculator`: Helper function to choose the top of the OCR axis so that the whole run is shown (including the start) while a narrow spike, such as the one when dithionite is added, does not stretch the axis.
 - `_window_drawer`: Helper function to draw the averaging windows behind the data on every axis.
 - `_window_label_builder`: Helper function to build the text of an averaging window from AVERAGING_WINDOW_LABEL_FORMAT.
 - `_ylim_calculator`: Helper function to calculate y limits from the data after the ignored start and before the ignored end, plus a margin.
@@ -159,7 +160,8 @@ Generated from the source. Names starting with `_` are private helpers.
 - `event_asker`: Main function to ask whether to change the event labels, concentrations and which events to ignore, file by file.
 - `files_asker`: Main function to ask for the folder of .paf files (1.1) and the results folder (1.2), and to read a summary of every file.
 - `haem_form_option_builder`: Helper function to build the (key, label) choices for the 'how to show the haems' questions. The delta A line explains itself in italics.
-- `haem_name_formatter`: Main function to write a haem name for the terminal: the $...$ maths markers are removed, subscripts become subscript characters where they exist, and the maths part is shown in italics, e.g. 'Cyt $b_H$' becomes 'Cyt bₕ'.
+- `haem_name_formatter`: Main function to write a haem name for the terminal: the $...$ maths markers are removed, subscripts are written as plain characters (Unicode subscripts are hard to read) and the maths part is shown in italics, e.g. 'Cyt $b_H$' becomes 'Cyt bH'.
+- `haem_name_sorter`: Main function to put haem names in alphabetical order of the name as shown (ignoring case and punctuation), for example a605, b557, bH, bL, cc.
 - `multi_experiment_asker`: Main function to ask section 5: the side-by-side figure of two experiments and the 2x2 figure of four experiments.
 - `ocr_option_builder`: Helper function to build the (key, label) choices for the OCR questions, using the units of the plot axes.
 - `od_asker`: Main function to ask the OD, volume and dilution factor of every file, offering the values saved in each experiment's workbook.

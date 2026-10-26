@@ -28,7 +28,8 @@ HAEM_AXIS_LABELS = {'raw': 'Haem concentration',
                     'delta_abs_od': 'ΔA (mOD OD$^{-1}$)',
                     }
 SAVE_FORMATS = ('svg', 'png')
-OUTPUT_SUBFOLDER = 'publication_figure'
+OUTPUT_SUBFOLDER = ''
+DATA_SUBFOLDER = 'triplicate_data'
 DELTA_A_OD_LABEL = '$\\Delta$A (mOD OD$^{-1}$)'
 HAEM_ABS_OD_LABEL = 'Haem absorbance (mOD OD$^{-1}$)'
 
@@ -49,7 +50,7 @@ def exemplar_config_builder(cfg: Config, answers: dict) -> dict:
         Terminal answers; uses ho_exemplar_run, ho_ex_columns and ho_ex_height.
 
     ---- Globals read ----
-    ORDER_COLUMNS, STRAIN_ROWS, SAVE_FORMATS, OUTPUT_SUBFOLDER.
+    ORDER_COLUMNS, STRAIN_ROWS, SAVE_FORMATS, OUTPUT_SUBFOLDER, DATA_SUBFOLDER.
 
     ---- Outputs ----
     dict
@@ -76,6 +77,7 @@ def exemplar_config_builder(cfg: Config, answers: dict) -> dict:
     return {'SAVE_FIGURE': True,
             'SAVE_FORMATS': SAVE_FORMATS,
             'OUTPUT_SUBFOLDER': OUTPUT_SUBFOLDER,
+            'DATA_SUBFOLDER': DATA_SUBFOLDER,
             'FILE_NAME': 'exemplar_figure',
             'ORDER_COLUMNS': ORDER_COLUMNS,
             'STRAIN_ROWS': STRAIN_ROWS,
@@ -211,7 +213,8 @@ def publication_config_builder(cfg: Config, answers: dict, haem_names: list) -> 
         Haem names of the fit, in fit order.
 
     ---- Globals read ----
-    ORDER_COLUMNS, STRAIN_ROWS, GROUP_STYLES, SAVE_FORMATS, OUTPUT_SUBFOLDER.
+    ORDER_COLUMNS, STRAIN_ROWS, GROUP_STYLES, SAVE_FORMATS, OUTPUT_SUBFOLDER,
+    DATA_SUBFOLDER.
 
     ---- Outputs ----
     dict
@@ -240,6 +243,7 @@ def publication_config_builder(cfg: Config, answers: dict, haem_names: list) -> 
     return ({'SAVE_FIGURE': True,
              'SAVE_FORMATS': SAVE_FORMATS,
              'OUTPUT_SUBFOLDER': OUTPUT_SUBFOLDER,
+             'DATA_SUBFOLDER': DATA_SUBFOLDER,
              'FILE_NAME': 'publication_figure',
              'ORDER_COLUMNS': ORDER_COLUMNS,
              'STRAIN_ROWS': STRAIN_ROWS,
@@ -282,6 +286,8 @@ def publication_config_builder(cfg: Config, answers: dict, haem_names: list) -> 
                                                      'abs_od': DELTA_A_OD_LABEL,
                                                      'delta_abs': '$\\Delta$A (mOD)',
                                                      'delta_abs_od': DELTA_A_OD_LABEL,
+                                                     'percent': 'Change in oxidised '
+                                                                'haem (%)',
                                                      'default': 'Change from baseline',
                                                      },
                                            'change': 'Change from baseline (%)',
@@ -322,8 +328,8 @@ def source_selector(answers: dict, od_available: bool) -> tuple:
 
     ---- Inputs ----
     answers : dict
-        Terminal answers; uses ho_ocr_mode ('raw' or 'od'), ho_haem_mode ('delta',
-        'abs' or 'conc') and ho_per_od.
+        Terminal answers; uses ho_ocr_mode ('raw', 'od' or 'percent'), ho_haem_mode
+        ('delta', 'abs', 'conc' or 'percent') and ho_per_od.
     od_available : bool
         True when the experiment has OD, volume and dilution factor.
 
@@ -348,10 +354,13 @@ def source_selector(answers: dict, od_available: bool) -> tuple:
     pairs = {'conc': ('raw', 'od'),
              'abs': ('abs', 'abs_od'),
              'delta': ('delta_abs', 'delta_abs_od'),
+             'percent': ('percent', 'percent'),
              }
     raw_haem, od_haem = pairs[answers['ho_haem_mode']]
     use_od = od_available and answers['ho_per_od']
-    vo2_source = 'od' if (od_available and answers['ho_ocr_mode'] == 'od') else 'raw'
+    vo2_source = answers['ho_ocr_mode']
+    if vo2_source == 'od' and not od_available:
+        vo2_source = 'raw'
     return vo2_source, (od_haem if use_od else raw_haem)
 
 
@@ -370,7 +379,7 @@ def time_response_config_builder(cfg: Config, answers: dict, haem_names: list,) 
         Haem names of the fit, used to colour the decomposition panels.
 
     ---- Globals read ----
-    SAVE_FORMATS, OUTPUT_SUBFOLDER.
+    SAVE_FORMATS, OUTPUT_SUBFOLDER, DATA_SUBFOLDER.
 
     ---- Outputs ----
     dict
@@ -397,6 +406,7 @@ def time_response_config_builder(cfg: Config, answers: dict, haem_names: list,) 
     return {'SAVE_FIGURE': True,
             'SAVE_FORMATS': SAVE_FORMATS,
             'OUTPUT_SUBFOLDER': OUTPUT_SUBFOLDER,
+            'DATA_SUBFOLDER': DATA_SUBFOLDER,
             'FILE_NAME': 'time_response_figure',
             'GROUP_ORDER': groups,
             'GROUP_TITLES': {group: group.capitalize() for group in groups},
@@ -411,7 +421,7 @@ def time_response_config_builder(cfg: Config, answers: dict, haem_names: list,) 
                                                                'haem': 5,
                                                                },
                                        'O2_AXIS_LABEL': 'O$_2$ (µM)',
-                                       'VO2_AXIS_LABELS': {'raw': 'OCR (µM)',
+                                       'VO2_AXIS_LABELS': {'raw': 'OCR\n(µM/min)',
                                                            'od': 'OCR\n(µM/min/OD)',
                                                            'percent': 'OCR (%)',
                                                            },

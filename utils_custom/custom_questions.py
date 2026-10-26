@@ -17,6 +17,7 @@ from utils_shared.survey import (averaging_asker,
                                  decomposition_asker,
                                  haem_form_option_builder,
                                  haem_name_formatter,
+                                 haem_name_sorter,
                                  ocr_option_builder,
                                  size_asker,
                                  )
@@ -63,6 +64,7 @@ def _haem_ocr_asker(names: List[str],
     choice_asker
     haem_form_option_builder
     haem_name_formatter
+    haem_name_sorter
     info_printer
     multi_asker
     ocr_option_builder
@@ -101,23 +103,25 @@ def _haem_ocr_asker(names: List[str],
                      depth=2,
                      )
     if left_out:
-        info_printer(f'Left out (name not recognised): {', '.join(left_out)}', depth=2)
+        left_text = ', '.join(left_out)
+        info_printer(f'Left out (name not recognised): {left_text}', depth=2)
 
     # ---- 2 What is shown -------------------------------------------------------------
-    answers['ho_ocr_mode'] = 'raw'
-    answers['ho_per_od'] = False
-    if answers['normalise_od']:
-        answers['ho_ocr_mode'] = choice_asker('Which OCR would you like to use?',
-                                              ocr_option_builder(['raw', 'od']),
-                                              defaults['ho_ocr_mode'],
-                                              depth=2,
-                                              )
+    ocr_keys = ['raw'] + (['od'] if answers['normalise_od'] else []) + ['percent']
+    answers['ho_ocr_mode'] = choice_asker('Which OCR would you like to use?',
+                                          ocr_option_builder(ocr_keys),
+                                          defaults['ho_ocr_mode']
+                                          if defaults['ho_ocr_mode'] in ocr_keys
+                                          else ocr_keys[0],
+                                          depth=2,
+                                          )
     answers['ho_haem_mode'] = choice_asker('How would you like to show the haems?',
-                                           haem_form_option_builder(False),
+                                           haem_form_option_builder(True),
                                            defaults['ho_haem_mode'],
                                            depth=2,
                                            )
-    if answers['normalise_od']:
+    answers['ho_per_od'] = False
+    if answers['normalise_od'] and answers['ho_haem_mode'] != 'percent':
         answers['ho_per_od'] = yes_no_asker('Do you want to scale the haems by OD as '
                                             'well?',
                                             defaults['ho_per_od'],
@@ -126,11 +130,13 @@ def _haem_ocr_asker(names: List[str],
     answers['ho_metric'] = 'delta'
     answers['ho_haems'] = multi_asker('Which haems should get a row, and in which '
                                       'order?',
-                                      list(fit['haem_list']),
+                                      haem_name_sorter(fit['haem_list']),
                                       default_all=True,
                                       keep_order=True,
                                       depth=2,
-                                      default_values=defaults['ho_haems'],
+                                      default_values=(defaults['ho_haems']
+                                                      or list(fit['haem_list'])
+                                                      ),
                                       label_formatter=haem_name_formatter,
                                       )
 
@@ -206,9 +212,8 @@ def _time_response_asker(names: List[str],
     members = {name: experiment['group'] for name, experiment in found.items()}
     for group in groups:
         listed = [n for n, g in members.items() if g == group]
-        info_printer(f'{group}: {', '.join(listed) if listed else 'no files found'}',
-                     depth=2,
-                     )
+        listed_text = ', '.join(listed) if listed else 'no files found'
+        info_printer(f'{group}: {listed_text}', depth=2)
     if any(group not in members.values() for group in groups):
         info_printer('Both groups need at least one file, so the time response is '
                      'skipped.',
@@ -228,12 +233,12 @@ def _time_response_asker(names: List[str],
                      )
         return None
     first_group = [n for n in timed if members[n] == groups[0]]
-    left = choice_asker('Which experiment should the left example show?',
+    left = choice_asker('Which experiment should the top example show?',
                         options,
                         first_group[0],
                         depth=2,
                         )
-    right = choice_asker('Which experiment should the right example show?',
+    right = choice_asker('Which experiment should the bottom example show?',
                          options,
                          first_group[-1] if first_group[-1] != left else options[-1][0],
                          depth=2,

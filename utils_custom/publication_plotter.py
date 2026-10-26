@@ -1992,6 +1992,8 @@ def _response_window_tester(ax: Axes,
     low, high = ax.get_ylim()
     high = max(high, max(result['top'] for result, _ in marks))
     ax.set_ylim(low, low + (high - low) / (1.0 - fraction))
+    # Only label ticks that lie within the data, not in the headroom above it.
+    ax.set_yticks([tick for tick in ax.get_yticks() if low <= tick <= high])
     half = config['RESPONSE_GROUP_DODGE'] / 2.0
     for result, text in marks:
         centre = x[result['index']]
@@ -2757,7 +2759,8 @@ def publication_figure_saver(fig: Figure, export_root: Path, config: dict) -> li
         Paths of the files written.
 
     ---- Globals mutated ----
-    None. Writes files under <export_root>/<OUTPUT_SUBFOLDER> (side effect).
+    None. Writes the figure under <export_root>/<OUTPUT_SUBFOLDER> and the test table
+    under <export_root>/<DATA_SUBFOLDER> (side effects).
 
     ---- Equations ----
     None.
@@ -2781,7 +2784,9 @@ def publication_figure_saver(fig: Figure, export_root: Path, config: dict) -> li
     # ---- 2 Save the test results -----------------------------------------------------
     tests = getattr(fig, 'response_tests', None)
     if tests:
-        table_path = folder / f"{config['FILE_NAME']}_response_tests.csv"
+        data_folder = Path(export_root) / config['DATA_SUBFOLDER']
+        data_folder.mkdir(parents=True, exist_ok=True)
+        table_path = data_folder / f"{config['FILE_NAME']}_response_tests.csv"
         pd.DataFrame(tests).to_csv(table_path, index=False)
         paths = list(paths) + [table_path]
 

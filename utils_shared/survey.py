@@ -8,6 +8,7 @@ from typing import Callable, Dict, List, Optional, Tuple
 # ---- LOCAL IMPORTS -------------------------------------------------------------------
 import config as settings
 from utils_custom.run_namer import run_name_lister
+from utils_shared.helpers import name_simplifier
 from utils_shared.individual_experiment_exporter import saved_settings_reader
 from utils_shared.paf_reader import experiment_summary_reader, PafError
 from utils_shared.questions import (choice_asker,
@@ -36,34 +37,6 @@ JOURNAL_NAMES = {'nature': 'Nature',
 OCR_LABELS = {'raw': 'OCR (µM min⁻¹)',
               'od': 'OCR / OD (µM min⁻¹ OD⁻¹)',
               'percent': 'OCR (% of the range)',
-              }
-SUBSCRIPTS = {'0': '₀',
-              '1': '₁',
-              '2': '₂',
-              '3': '₃',
-              '4': '₄',
-              '5': '₅',
-              '6': '₆',
-              '7': '₇',
-              '8': '₈',
-              '9': '₉',
-              'a': 'ₐ',
-              'e': 'ₑ',
-              'h': 'ₕ',
-              'i': 'ᵢ',
-              'j': 'ⱼ',
-              'k': 'ₖ',
-              'l': 'ₗ',
-              'm': 'ₘ',
-              'n': 'ₙ',
-              'o': 'ₒ',
-              'p': 'ₚ',
-              'r': 'ᵣ',
-              's': 'ₛ',
-              't': 'ₜ',
-              'u': 'ᵤ',
-              'v': 'ᵥ',
-              'x': 'ₓ',
               }
 
 
@@ -118,7 +91,7 @@ def _event_line_builder(event: dict, entry: dict) -> str:
 
     ---- Outputs ----
     str
-        For example '  nd-011992, 15.01 min' or with the concentration and
+        For example '  15.01 min: nd-011992' or with the concentration and
         '[IGNORED]' when they apply.
 
     ---- Globals mutated ----
@@ -136,7 +109,7 @@ def _event_line_builder(event: dict, entry: dict) -> str:
             else f", {entry['concentration_uM']:g} uM"
             )
     note = '  [IGNORED]' if entry['ignored'] else ''
-    return f"  {entry['label']}, {event['time']:.2f} min{conc}{note}"
+    return f"  {event['time']:.2f} min: {entry['label']}{conc}{note}"
 
 
 # ---- _LIMITS ASKER -------------------------------------------------------------------
@@ -764,15 +737,15 @@ def haem_name_formatter(name: str) -> str:
     """
     ---- Summary ----
     Main function to write a haem name for the terminal: the $...$ maths markers are
-    removed, subscripts become subscript characters where they exist, and the maths
-    part is shown in italics, e.g. 'Cyt $b_H$' becomes 'Cyt bₕ'.
+    removed, subscripts are written as plain characters (Unicode subscripts are hard to
+    read) and the maths part is shown in italics, e.g. 'Cyt $b_H$' becomes 'Cyt bH'.
 
     ---- Inputs ----
     name : str
         Haem name as written in the fit file.
 
     ---- Globals read ----
-    SUBSCRIPTS (module constant).
+    None.
 
     ---- Outputs ----
     str
@@ -786,27 +759,27 @@ def haem_name_formatter(name: str) -> str:
 
     ---- Helpers ----
     _maths_converter
-    _subscript_converter
+    _subscript_stripper
     text_italiser
     """
 
     # ---- 1 Define the converters -----------------------------------------------------
-    def _subscript_converter(match: 're.Match') -> str:
+    def _subscript_stripper(match: 're.Match') -> str:
         """
         ---- Summary ----
-        Helper function to turn a matched subscript (_x or _{xy}) into Unicode
-        subscript characters, or leave it as _x when a character has no subscript form.
+        Helper function to turn a matched subscript (_x or _{xy}) into plain text, since
+        Unicode subscripts are hard to read in a terminal.
 
         ---- Inputs ----
         match : re.Match
             Match whose group 1 or 2 holds the subscript text.
 
         ---- Globals read ----
-        SUBSCRIPTS (module constant).
+        None.
 
         ---- Outputs ----
         str
-            The converted subscript text.
+            The subscript text without the underscore.
 
         ---- Globals mutated ----
         None.
@@ -818,10 +791,7 @@ def haem_name_formatter(name: str) -> str:
         None.
         """
 
-        text = match.group(1) if match.group(1) is not None else match.group(2)
-        if all(c.lower() in SUBSCRIPTS for c in text):
-            return ''.join(SUBSCRIPTS[c.lower()] for c in text)
-        return '_' + text
+        return match.group(1) if match.group(1) is not None else match.group(2)
     def _maths_converter(match: 're.Match') -> str:
         """
         ---- Summary ----
@@ -846,14 +816,45 @@ def haem_name_formatter(name: str) -> str:
         None.
 
         ---- Helpers ----
-        _subscript_converter, text_italiser
+        _subscript_stripper, text_italiser
         """
 
-        inner = re.sub(r'_\{([^}]*)\}|_(.)', _subscript_converter, match.group(1))
+        inner = re.sub(r'_\{([^}]*)\}|_(.)', _subscript_stripper, match.group(1))
         return text_italiser(inner.replace('\\', ''))
 
     # ---- 2 Convert the maths spans ---------------------------------------------------
     return re.sub(r'\$([^$]*)\$', _maths_converter, str(name))
+
+
+# ---- HAEM NAME SORTER ----------------------------------------------------------------
+def haem_name_sorter(names: List[str]) -> List[str]:
+    """
+    ---- Summary ----
+    Main function to put haem names in alphabetical order of the name as shown (ignoring
+    case and punctuation), for example a605, b557, bH, bL, cc.
+
+    ---- Inputs ----
+    names : List[str]
+        Haem names as written in the fit file.
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    List[str]
+        The same names, sorted; the input list is not changed.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    name_simplifier
+    """
+
+    return sorted(names, key=name_simplifier)
 
 
 # ---- MULTI EXPERIMENT ASKER ----------------------------------------------------------
@@ -931,7 +932,7 @@ def multi_experiment_asker(summaries: List[dict],
                     'height': 'comparison_height',
                     'mode': 'comparison_size_mode',
                     },
-                   (1.5, 0.7),
+                   (1.5, 0.5),
                    depth=2,
                    )
         comparison = {'runs': (first, second),
@@ -984,7 +985,7 @@ def multi_experiment_asker(summaries: List[dict],
                         'height': 'ho_ex_height',
                         'mode': 'ex_size_mode',
                         },
-                       (1.5, 0.7),
+                       (1.5, 0.75),
                        depth=2,
                        )
             answers['plot_exemplar'] = True
@@ -1157,6 +1158,7 @@ def plot_asker(answers: dict, defaults: dict, fit: Optional[dict]) -> bool:
     choice_asker
     haem_form_option_builder
     haem_name_formatter
+    haem_name_sorter
     info_printer
     multi_asker
     number_asker
@@ -1192,11 +1194,13 @@ def plot_asker(answers: dict, defaults: dict, fit: Optional[dict]) -> bool:
     if answers['plot_haems']:
         answers['haems'] = multi_asker('Which haems would you like to plot, and in '
                                        'which order?',
-                                       list(fit['haem_list']),
+                                       haem_name_sorter(fit['haem_list']),
                                        default_all=True,
                                        keep_order=True,
                                        depth=2,
-                                       default_values=defaults['haems'],
+                                       default_values=(defaults['haems']
+                                                       or list(fit['haem_list'])
+                                                       ),
                                        label_formatter=haem_name_formatter,
                                        )
         answers['haem_mode'] = choice_asker('How would you like to plot the haems?',

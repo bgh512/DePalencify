@@ -45,7 +45,9 @@ haem, the list of runs, and `settings` copied from the runs' `averages`.
 ```
 <results>/<experiment>/<experiment>.xlsx   one workbook per experiment
 <results>/<experiment>/                    figure files
-<results>/publication_figure/              special figures and their tables
+<results>/*.svg, *.png                      comparison, 2x2, time response and
+                                           haem and OCR response figures
+<results>/triplicate_data/                 tables behind the special figures
 ```
 
 ## last_answers.json
