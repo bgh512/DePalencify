@@ -268,6 +268,7 @@ Generated from the source. Names starting with `_` are private helpers.
 - `_event_label_height_calculator`: Helper function to calculate the height the rotated event labels above the example time courses need.
 - `_example_finder`: Helper function to find the experiment of one group at a given number of hours.
 - `_example_viewer`: Helper function to copy an experiment so that its individual figure shows only the two windows its difference spectrum came from.
+- `_haem_window_drawer`: Helper function to shade, behind the spectra, a window around the peak of every haem in the haem's own colour, to show where each haem should appear.
 - `_legend_drawer`: Helper function to draw a legend in the journal style: small text and an optional thin box.
 - `_time_axes_styler`: Helper function to apply the tick direction, label size and spine style.
 - `_time_gap_calculator`: Helper function to calculate the row and column gaps of the time response figure from the font sizes and the figure size.

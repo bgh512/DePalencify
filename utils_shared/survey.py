@@ -978,6 +978,11 @@ def multi_experiment_asker(summaries: List[dict],
                 answers['averaging'] = True
             exemplar_names = [r['name'] for r in rows if r['run'] == int(run)]
             info_printer(f"Using: {', '.join(exemplar_names)}", depth=2)
+            answers['ex_watermark'] = yes_no_asker('Do you want the run name written '
+                                                   'faintly on each plot?',
+                                                   defaults['ex_watermark'],
+                                                   depth=2,
+                                                   )
             size_asker(answers,
                        defaults,
                        {'journal': 'ex_journal',

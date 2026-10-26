@@ -208,7 +208,7 @@ def _baseline_bar_plotter(ax: Axes,
                     )
 
     # ---- 3 Label the axes ------------------------------------------------------------
-    ax.set_title('Baseline OCR (average0)')
+    ax.set_title('Baseline OCR')
     ax.set_ylabel(config['VO2_AXIS_LABELS'].get(vo2_source, 'VO2'),
                   fontsize=config['RESPONSE_YLABEL_FONT_SIZE'],
                   )
@@ -491,7 +491,8 @@ def _exemplar_gap_calculator(config: dict,
 
     ---- Equations ----
     row_gap = 1.2 tick + 0.5 unit + label pad + 1.2 label + 1.0 unit; column_gap = lines
-    x 1.2 label + y label pad + 5 x 0.55 tick + 0.5 unit + 1.5 unit (points).
+    x 1.2 label + y label pad + 5 x 0.55 tick + 0.5 unit + 1.5 unit (points) for one
+    column, 1.5 unit when there are several (the later columns have no y labels).
 
     ---- Helpers ----
     gap_space_calculator
@@ -523,6 +524,9 @@ def _exemplar_gap_calculator(config: dict,
                   0.5 * unit +
                   1.5 * unit
                   )
+    if n_columns > 1:
+        # the columns after the first have no y labels or tick labels
+        column_gap = 1.5 * unit
     return (gap_space_calculator(row_gap, height_pt - 6 * unit, n_rows),
             gap_space_calculator(column_gap, width_pt - 8 * unit, n_columns),
             )
@@ -1934,11 +1938,13 @@ def _response_window_tester(ax: Axes,
         result = scipy_stats.ttest_ind(a, b, equal_var=True)
         if not np.isfinite(result.pvalue):
             continue
-        top = max(a.max(),
-                  b.max(),
-                  *(s[mean_key] + (s[sem_key] if np.isfinite(s[sem_key]) else 0.0)
-                    for s in (stats_a, stats_b)
-                    ),
+        # The bar sits above the means plus their SEM, with the SEM capped at a tenth of
+        # the axis so that one noisy window or outlier run does not stretch the axis
+        sem_cap = 0.1 * (ax.get_ylim()[1] - ax.get_ylim()[0])
+        top = max(s[mean_key] + (min(s[sem_key], sem_cap)
+                                 if np.isfinite(s[sem_key])
+                                 else 0.0)
+                  for s in (stats_a, stats_b)
                   )
         results.append({'index': i,
                         'window': window,
@@ -2503,6 +2509,16 @@ def exemplar_figure_plotter(experiments: dict,
                                if r == 0
                                else {**individual_config, 'EVENT_LABELS': False}
                                )
+            if len(orders) > 1:
+                no_legends = {'oxygen': False, 'vo2': False, 'haem': False}
+                if c == 0:
+                    quadrant_config = {**quadrant_config, 'SHOW_LEGENDS': no_legends}
+                else:
+                    quadrant_config = {**quadrant_config, 'SHOW_Y_LABELS': False}
+                    if c == len(orders) - 1:
+                        quadrant_config['LEGENDS_OUTSIDE'] = True
+                    else:
+                        quadrant_config['SHOW_LEGENDS'] = no_legends
             axes = _exemplar_plotter(fig, grid[r, c], experiment, quadrant_config)
             axes_by_cell[(strain, order)] = axes
             letter = next(letters)
@@ -2521,7 +2537,19 @@ def exemplar_figure_plotter(experiments: dict,
                              )
             panels.append((letter, axes[0], list(axes)))
 
-    # ---- 5 Fit margins and add panel letters -----------------------------------------
+    # ---- 5 Give each haem the same y axis in every quadrant -------------------------
+    by_haem = {}
+    for quadrant_axes in axes_by_cell.values():
+        for ax in quadrant_axes:
+            names = getattr(ax, 'haem_names', None)
+            if names:
+                by_haem.setdefault(tuple(names), []).append(ax)
+    for group in by_haem.values():
+        lows, highs = zip(*(sorted(ax.get_ylim()) for ax in group))
+        for ax in group:
+            ax.set_ylim(min(lows), max(highs))
+
+    # ---- 6 Fit margins and add panel letters -----------------------------------------
     suptitle = None
     if config['FIGURE_TITLE']:
         suptitle = fig.suptitle(config['FIGURE_TITLE'],

@@ -161,11 +161,65 @@ def _example_viewer(experiment: dict) -> dict:
             }
 
 
+# ---- _HAEM WINDOW DRAWER -------------------------------------------------------------
+def _haem_window_drawer(ax: Axes, decomposition: dict, config: dict) -> None:
+    """
+    ---- Summary ----
+    Helper function to shade, behind the spectra, a window around the peak of every
+    haem in the haem's own colour, to show where each haem should appear.
+
+    ---- Inputs ----
+    ax : Axes
+        Matplotlib axes with wavelength on the x axis.
+    decomposition : dict
+        difference_decomposition of an experiment (DATA_FORMAT.md).
+    config : dict
+        Figure settings dictionary built in custom_config.py.
+
+    ---- Globals read ----
+    config keys HAEM_COLOURS, HAEM_WINDOW_HALF_WIDTH_NM and HAEM_WINDOW_ALPHA.
+
+    ---- Outputs ----
+    None
+
+    ---- Globals mutated ----
+    None. Draws on ``ax`` and leaves its x limits as they were (side effect).
+
+    ---- Equations ----
+    window = peak +- HAEM_WINDOW_HALF_WIDTH_NM, where the peak is the wavelength of the
+    largest absolute value of the haem's fitted component.
+
+    ---- Helpers ----
+    name_simplifier
+    """
+
+    # ---- 1 Draw one window per haem --------------------------------------------------
+    colours = {name_simplifier(k): v for k, v in config['HAEM_COLOURS'].items()}
+    half = config['HAEM_WINDOW_HALF_WIDTH_NM']
+    x_limits = ax.get_xlim()
+    for name, component in zip(decomposition['haem_names'],
+                               decomposition['haem_individual'],
+                               ):
+        values = np.abs(component[:, 1])
+        if not np.isfinite(values).any() or np.nanmax(values) == 0:
+            continue
+        centre = float(component[int(np.nanargmax(values)), 0])
+        ax.axvspan(centre - half,
+                   centre + half,
+                   color=colours.get(name_simplifier(name)),
+                   alpha=config['HAEM_WINDOW_ALPHA'],
+                   linewidth=0,
+                   zorder=0,
+                   )
+    ax.set_xlim(x_limits)
+
+
 # ---- _LEGEND DRAWER ------------------------------------------------------------------
 def _legend_drawer(ax: Axes,
                    config: dict,
                    location: str,
                    columns: Optional[int] = None,
+                   outside: bool = False,
                    ) -> Any:
     """
     ---- Summary ----
@@ -181,6 +235,8 @@ def _legend_drawer(ax: Axes,
         Matplotlib legend location.
     columns : Optional[int]
         Number of legend columns, or None for the setting.
+    outside : bool
+        True puts the legend in the white space to the right of the axes.
 
     ---- Globals read ----
     None.
@@ -199,7 +255,13 @@ def _legend_drawer(ax: Axes,
     None.
     """
 
-    legend = ax.legend(loc=location,
+    options = {}
+    if outside:
+        options = {'loc': 'upper left',
+                   'bbox_to_anchor': (1.03, 1.0),
+                   'borderaxespad': 0,
+                   }
+    legend = ax.legend(**{'loc': location, **options},
                        frameon=config['LEGEND_FRAME'],
                        fontsize=config['LEGEND_FONT_SIZE'],
                        ncol=columns or config['LEGEND_COLUMNS'],
@@ -375,6 +437,7 @@ def decomposition_plotter(ax: Axes, decomposition: dict, config: dict) -> None:
     None.
 
     ---- Helpers ----
+    _haem_window_drawer
     _legend_drawer
     _time_axes_styler
     name_simplifier
@@ -412,6 +475,8 @@ def decomposition_plotter(ax: Axes, decomposition: dict, config: dict) -> None:
                 )
 
     # ---- 4 Style the axes ------------------------------------------------------------
+    ax.set_xlim(left=np.min(measured[:, 0]), right=np.max(measured[:, 0]))
+    _haem_window_drawer(ax, decomposition, config)
     ax.set_xlabel('Wavelength (nm)', fontsize=config['AXIS_LABEL_FONT_SIZE'])
     ax.set_ylabel(config['DECOMPOSITION_Y_LABEL'],
                   fontsize=config['AXIS_LABEL_FONT_SIZE'],
@@ -669,15 +734,14 @@ def time_response_figure_plotter(experiments: dict,
                     hspace=row_hspace,
                     wspace=column_wspace,
                     )
-    # The two waterfalls are stacked in the top-left cell; the top-right cell is left
-    # empty. The gap between them holds the title of
-    # the lower one (and the wavelength axis is written once, under the lower, when they
-    # share it).
+    # The two waterfalls are stacked in the centre of the bottom row, in a quarter of
+    # the figure width. The gap between them holds the title of the lower one (and the
+    # wavelength axis is written once, under the lower, when they share it).
     # ---- 3 Draw the waterfalls -------------------------------------------------------
     unit = config['UNIT_PT']
     ratios = config['HEIGHT_RATIOS']
-    top_row_pt = (config['FIGURE_SIZE'][1] * 72.0 - 6 * unit - 2 * row_gap
-                  ) * ratios[0] / sum(ratios)
+    waterfall_row_pt = (config['FIGURE_SIZE'][1] * 72.0 - 6 * unit - 2 * row_gap
+                        ) * ratios[2] / sum(ratios)
     stack_gap = 1.2 * config['TITLE_FONT_SIZE'] + 0.8 * unit + 1.0 * unit
     if config['WATERFALL_SHARE_X_AXIS']:
         stack_gap += 0.5 * unit  # the upper panel keeps its tick marks
@@ -686,17 +750,26 @@ def time_response_figure_plotter(experiments: dict,
                       1.0 * unit +
                       1.2 * config['AXIS_LABEL_FONT_SIZE']
                       )
-    stacked = grid[0, 0].subgridspec(2,
-                                     1,
-                                     hspace=gap_space_calculator(stack_gap,
-                                                                 top_row_pt,
-                                                                 2,
-                                                                 ),
+    fraction = config['WATERFALL_WIDTH_FRACTION']
+    centred = grid[2, :].subgridspec(1,
+                                     3,
+                                     width_ratios=[(1 - fraction) / 2,
+                                                   fraction,
+                                                   (1 - fraction) / 2,
+                                                   ],
+                                     wspace=0,
                                      )
+    stacked = centred[0, 1].subgridspec(2,
+                                        1,
+                                        hspace=gap_space_calculator(stack_gap,
+                                                                    waterfall_row_pt,
+                                                                    2,
+                                                                    ),
+                                        )
     axes, panels = {}, []
     for index, group in enumerate(group_order):
         shared = config['WATERFALL_SHARE_X_AXIS'] and index == 1
-        ax = fig.add_subplot(stacked[index, 0], sharex=axes['A'] if shared else None)
+        ax = fig.add_subplot(stacked[index, 0], sharex=axes['E'] if shared else None)
         _title_styler(ax, config['GROUP_TITLES'].get(group, group), config)
         waterfall_plotter(ax,
                           groups[group],
@@ -707,10 +780,10 @@ def time_response_figure_plotter(experiments: dict,
         if config['WATERFALL_SHARE_X_AXIS'] and index == 0:
             ax.set_xlabel('')
             ax.tick_params(axis='x', labelbottom=False)
-        axes['AB'[index]] = ax
+        axes['EF'[index]] = ax
 
     # ---- 4 Draw the examples ---------------------------------------------------------
-    for row, (group, label, experiment) in enumerate(example_picks, start=1):
+    for row, (group, label, experiment) in enumerate(example_picks):
         known = {id(ax) for ax in fig.axes}
         stack, _ = experiment_drawer(fig,
                                      grid[row, 0],
@@ -727,16 +800,14 @@ def time_response_figure_plotter(experiments: dict,
                               experiment['difference_decomposition'],
                               config,
                               )
-        left_letter, right_letter = ('CD', 'EF')[row - 1]
+        left_letter, right_letter = ('AB', 'CD')[row]
         axes[left_letter], axes[right_letter] = stack, decomposition_ax
         panels += [(left_letter, stack[0], members),
                    (right_letter, decomposition_ax, [decomposition_ax]),
                    ]
 
     # ---- 5 Fit margins and add panel letters -----------------------------------------
-    panels = ([(letter, ax, [ax]) for letter, ax in (('A', axes['A']), ('B', axes['B']))
-               ] + panels
-              )
+    panels = panels + [(letter, axes[letter], [axes[letter]]) for letter in 'EF']
     suptitle = (fig.suptitle(config['FIGURE_TITLE'],
                              fontsize=config['SUPTITLE_FONT_SIZE'],
                              fontweight='bold',
@@ -839,6 +910,7 @@ def waterfall_plotter(ax: Axes,
     min(aligned_i) + (n - 1 - i) x offset; offset defaults to 0.75 x the largest span.
 
     ---- Helpers ----
+    _haem_window_drawer
     _legend_drawer
     _time_axes_styler
     shared_baseline_subtracter
@@ -913,11 +985,13 @@ def waterfall_plotter(ax: Axes,
     ax.set_ylabel(config['WATERFALL_Y_LABEL'], fontsize=config['AXIS_LABEL_FONT_SIZE'])
     _time_axes_styler(ax, config)
     ax.set_yticks([])
+    _haem_window_drawer(ax, items[0][1]['difference_decomposition'], config)
     if show_legend:
         _legend_drawer(ax,
                        config,
                        config['WATERFALL_LEGEND_LOCATION'],
                        config['WATERFALL_LEGEND_COLUMNS'],
+                       outside=config['WATERFALL_LEGEND_OUTSIDE'],
                        )
     if displayed:
         low, high = np.min(displayed), np.max(displayed)

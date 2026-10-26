@@ -144,8 +144,9 @@ def _axes_legend_drawer(ax: Axes,
         Legend location; None uses config["LEGEND_LOCATION"].
 
     ---- Globals read ----
-    config keys LEGEND_LOCATION, LEGEND_COLUMNS, LEGEND_FRAME, LEGEND_FONT_SIZE and
-    LEGEND_FRAME_LINE_WIDTH.
+    config keys LEGEND_LOCATION, LEGEND_COLUMNS, LEGEND_FRAME, LEGEND_FONT_SIZE,
+    LEGEND_FRAME_LINE_WIDTH and LEGENDS_OUTSIDE (legend in the white space right of
+    the axes).
 
     ---- Outputs ----
     Legend
@@ -171,6 +172,8 @@ def _axes_legend_drawer(ax: Axes,
     # ---- 2 Draw the legend -----------------------------------------------------------
     if text_only:
         options.update(handlelength=0, handletextpad=0)
+    if config.get('LEGENDS_OUTSIDE', False):
+        options.update(loc='center left', bbox_to_anchor=(1.02, 0.5), borderaxespad=0)
     legend = ax.legend(**options)
     if config['LEGEND_FRAME']:
         legend.get_frame().set_linewidth(config.get('LEGEND_FRAME_LINE_WIDTH', 0.4))
@@ -763,7 +766,15 @@ def experiment_drawer(fig: Figure,
                        else {'color': config['VO2_COLOUR']}
                        ),
                     )
-            ax.set_ylabel(vo2_label, labelpad=config['Y_LABEL_PAD'])
+            ax.set_ylabel(vo2_label,
+                          labelpad=config['Y_LABEL_PAD']
+                          + (1.9 * config.get('LABEL_FONT_SIZE',
+                                              config['TICK_FONT_SIZE'] + 1,
+                                              )
+                             if '\n' in vo2_label
+                             else 0
+                             ),
+                          )
             _min_ticks_setter(ax.yaxis, config['VO2_Y_NUM_TICKS'])
             y_max = config['VO2_Y_MAX']
             if y_max is None and np.isfinite(y).any():
@@ -783,6 +794,7 @@ def experiment_drawer(fig: Figure,
                         zorder=3,
                         )
             ax.set_ylabel(panel['title'], labelpad=config['Y_LABEL_PAD'])
+            ax.haem_names = [name_simplifier(haem) for haem in panel['haems']]
             _min_ticks_setter(ax.yaxis, config['HAEM_Y_NUM_TICKS'])
             if config['HAEM_Y_MIN'] is not None or config['HAEM_Y_MAX'] is not None:
                 ax.set_ylim(config['HAEM_Y_MIN'], config['HAEM_Y_MAX'])
@@ -831,6 +843,17 @@ def experiment_drawer(fig: Figure,
         ax.set_xlim(left=left, right=right)
     for ax in axes[:-1]:
         ax.tick_params(axis='x', labelbottom=False)
+    max_ticks = config.get('HAEM_Y_MAX_TICKS')
+    for ax, panel in zip(axes, panels):
+        if max_ticks and panel['type'] == 'haem':
+            low, high = sorted(ax.get_ylim())
+            ticks = [tick for tick in ax.get_yticks() if low <= tick <= high]
+            if len(ticks) > max_ticks:
+                ax.set_yticks([ticks[0], ticks[-1]])
+    if not config.get('SHOW_Y_LABELS', True):
+        for ax in axes:
+            ax.set_ylabel('')
+            ax.tick_params(axis='y', labelleft=False)
     if config.get('HIDE_TOUCHING_TICK_LABELS', False):
         for ax in axes[1:]:
             ax.yaxis.set_major_formatter(_HideTopTickLabels(config['TICK_FONT_SIZE']))
@@ -894,7 +917,7 @@ def experiment_drawer(fig: Figure,
     # under any later layout change); each haem axis carries only its own short label.
     haem_rows = [i for i, panel in enumerate(panels) if panel['type'] == 'haem']
     label_axes = list(axes)
-    if haem_rows:
+    if haem_rows and config.get('SHOW_Y_LABELS', True):
         span = fig.add_subplot(grid[haem_rows[0]:haem_rows[-1] + 1, 0], frameon=False)
         span.set_xticks([])
         span.set_yticks([])
@@ -906,14 +929,17 @@ def experiment_drawer(fig: Figure,
                                           config['TICK_FONT_SIZE'] + 1,
                                           ) + config['Y_LABEL_PAD']
                          )
-        span.set_ylabel(haem_label, labelpad=span_pad)
+        span.set_ylabel(haem_label, labelpad=span_pad + 0.7 * config.get(
+            'LABEL_FONT_SIZE', config['TICK_FONT_SIZE'] + 1))
         label_axes.append(span)
 
     # ---- 8 Align the y labels --------------------------------------------------------
     # Line every y-label up at the same distance (Y_LABEL_PAD) from the left-most tick
     # labels.
     if config['ALIGN_Y_LABELS']:
-        fig.align_ylabels(label_axes)
+        aligned = [ax for ax, panel in zip(axes, panels)
+                   if panel['type'] not in ('oxygen', 'vo2')]
+        fig.align_ylabels(aligned + label_axes[len(axes):])
     return axes, panels
 
 
