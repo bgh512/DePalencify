@@ -48,6 +48,7 @@ Generated from the source. Names starting with `_` are private helpers.
 
 ## utils_shared/helpers.py
 
+- `concentration_formatter`: Main function to write a concentration given in micromolar with the most readable unit: M from 1 000 000 uM, mM from 1000 uM and uM below that.
 - `excel_sheet_namer`: Main function to make a valid, unique Excel sheet name (at most 31 characters, no special characters).
 - `figure_saver`: Main function to save a figure in each requested format at exactly the requested size. The size is pinned again just before saving because interactive backends resize figures, and tight cropping is off unless requested.
 - `file_name_sanitiser`: Main function to replace the characters that are illegal in file names.
@@ -217,6 +218,7 @@ Generated from the source. Names starting with `_` are private helpers.
 - `_haem_source_finder`: Helper function to find the haem source that every condition's averages were calculated from.
 - `_layout_validator`: Helper function to check that the layout options of the publication figure are recognised and to return the group and order lists.
 - `_legend_handle_builder`: Helper function to build legend entries showing each group's colour, line style and marker.
+- `_mean_ylim_setter`: Helper function to set the y range of a response panel from the group means (and the baseline level) only, so that a single outlier run or a very large error bar does not stretch the axis. Points and error bars beyond the range are clipped.
 - `_measurement_finder`: Helper function to find the column matching a wanted name, ignoring case and punctuation.
 - `_metric_field_selector`: Helper function to name the keys of the triplicate statistics used by a response metric.
 - `_ocr_block_plotter`: Helper function to draw the OCR response (percent of each run's baseline, mean and SEM across runs), one axes per addition order.

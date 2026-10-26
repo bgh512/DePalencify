@@ -18,7 +18,10 @@ from utils_shared.figure_layout import (figure_canvas_fitter,
                                         panel_letter_adder,
                                         text_extent_calculator,
                                         )
-from utils_shared.helpers import figure_saver, name_simplifier
+from utils_shared.helpers import (concentration_formatter,
+                                  figure_saver,
+                                  name_simplifier,
+                                  )
 from utils_shared.individual_experiment_plotter import experiment_drawer
 
 
@@ -69,7 +72,7 @@ def _event_label_height_calculator(experiments: list, individual_config: dict) -
     for experiment in experiments:
         for event in experiment.get('metadata', {}).get('events', []):
             conc = event.get('concentration_uM')
-            text = (f"{'?' if conc is None else format(float(conc), 'g')} µM "
+            text = (f"{'? µM' if conc is None else concentration_formatter(conc)} "
                     f"{event.get('label', '')}".strip()
                     )
             heights.append(text_extent_calculator(text,

@@ -21,7 +21,10 @@ from utils_shared.figure_layout import (figure_canvas_fitter,
                                         gap_space_calculator,
                                         panel_letter_adder,
                                         )
-from utils_shared.helpers import figure_saver, name_simplifier
+from utils_shared.helpers import (concentration_formatter,
+                                  figure_saver,
+                                  name_simplifier,
+                                  )
 from utils_shared.individual_experiment_plotter import (_HideTopTickLabels,
                                                         experiment_drawer,
                                                         experiment_title_builder,
@@ -908,6 +911,7 @@ def _haem_block_plotter(fig: Figure,
                                                  metric=metric,
                                                  offset=dodge,
                                                  )
+            _mean_ylim_setter(ax, list(series.values()), metric, baseline_level)
             if tests is not None:
                 _response_window_tester(ax,
                                         x,
@@ -1232,6 +1236,65 @@ def _legend_handle_builder(strains: tuple, config: dict) -> list:
             ]
 
 
+# ---- _MEAN YLIM SETTER ---------------------------------------------------------------
+def _mean_ylim_setter(ax: Axes,
+                      series_list: list,
+                      metric: str,
+                      baseline_level: Optional[float] = None,
+                      margin: float = 0.12,
+                      ) -> None:
+    """
+    ---- Summary ----
+    Helper function to set the y range of a response panel from the group means (and
+    the baseline level) only, so that a single outlier run or a very large error bar
+    does not stretch the axis. Points and error bars beyond the range are clipped.
+
+    ---- Inputs ----
+    ax : Axes
+        Response panel, with the series already drawn.
+    series_list : list
+        One list of window statistics per strain, as drawn by _response_series_drawer.
+    metric : str
+        Response metric, which decides the field holding the mean.
+    baseline_level : Optional[float]
+        Reference level that must stay in view (for example 100 for % of baseline).
+    margin : float
+        Fraction of the mean range added above and below.
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    None.
+
+    ---- Globals mutated ----
+    None. Sets the y limits of ``ax`` (side effect); does nothing when no mean is
+    finite.
+
+    ---- Equations ----
+    low = min(means) - margin x range; high = max(means) + margin x range, where the
+    range is max(means) - min(means) (at least 1 % of the largest absolute mean).
+
+    ---- Helpers ----
+    _metric_field_selector
+    """
+
+    # ---- 1 Collect the means ---------------------------------------------------------
+    mean_key = _metric_field_selector(metric)[0]
+    values = [s[mean_key] for series in series_list for s in series if s]
+    if baseline_level is not None:
+        values.append(baseline_level)
+    values = np.array(values, dtype=float)
+    values = values[np.isfinite(values)]
+    if values.size == 0:
+        return
+
+    # ---- 2 Set the limits ------------------------------------------------------------
+    low, high = float(values.min()), float(values.max())
+    span = max(high - low, 0.01 * max(abs(low), abs(high), 1e-12))
+    ax.set_ylim(low - margin * span, high + margin * span)
+
+
 # ---- _MEASUREMENT FINDER -------------------------------------------------------------
 def _measurement_finder(available: Iterable, wanted: str) -> Optional[str]:
     """
@@ -1415,6 +1478,7 @@ def _ocr_block_plotter(fig: Figure,
                                     )
 
         # ---- 2.4 Add the significance tests ------------------------------------------
+        _mean_ylim_setter(ax, list(series.values()), 'change', 100)
         if tests is not None:
             _response_window_tester(ax,
                                     x,
@@ -2254,7 +2318,7 @@ def _tick_label_builder(experiment: Optional[dict], window_names: list) -> list:
             label = event.get('label') or event.get('name') or f'Addition {number}'
             conc = event.get('concentration_uM')
             try:
-                labels.append(f'{label}\n{float(conc):g} µM'
+                labels.append(f'{label}\n{concentration_formatter(conc)}'
                               if conc is not None
                               else str(label),
                               )

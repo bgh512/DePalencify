@@ -21,7 +21,10 @@ import pandas as pd
 
 # ---- LOCAL IMPORTS -------------------------------------------------------------------
 from utils_shared.figure_layout import figure_canvas_fitter
-from utils_shared.helpers import figure_saver, name_simplifier
+from utils_shared.helpers import (concentration_formatter,
+                                  figure_saver,
+                                  name_simplifier,
+                                  )
 from utils_shared.schema import (HAEM_KEYS,
                                  measurement_column_finder,
                                  source_resolver,
@@ -271,7 +274,7 @@ def _height_ratio_calculator(panels: List[dict], config: dict) -> List[float]:
         config.py.
 
     ---- Globals read ----
-    config key PANEL_HEIGHT_RATIOS.
+    config keys PANEL_HEIGHT_RATIOS and EQUAL_PANEL_HEIGHTS.
 
     ---- Outputs ----
     List[float]
@@ -282,13 +285,16 @@ def _height_ratio_calculator(panels: List[dict], config: dict) -> List[float]:
     None.
 
     ---- Equations ----
-    ratio = weight for oxygen and vo2 panels; weight / n_haem for each haem panel.
+    ratio = weight for oxygen and vo2 panels; weight / n_haem for each haem panel; 1 for
+    every panel when EQUAL_PANEL_HEIGHTS is set.
 
     ---- Helpers ----
     None.
     """
 
     # ---- 1 Read the weights ----------------------------------------------------------
+    if config.get('EQUAL_PANEL_HEIGHTS'):
+        return [1.0] * len(panels)
     weights = config['PANEL_HEIGHT_RATIOS']
     n_haem = sum(panel['type'] == 'haem' for panel in panels)
 
@@ -810,7 +816,8 @@ def experiment_drawer(fig: Figure,
             y_edge, sign, vertical = (1, 1, 'bottom') if on_top else (0, -1, 'top')
             for event in events:
                 conc = event.get('concentration_uM')
-                text = (f"{float(conc):g} µM {event.get('label', '')}".strip()
+                text = (f"{concentration_formatter(conc)} "
+                        f"{event.get('label', '')}".strip()
                         if conc is not None
                         else str(event.get('label', ''))
                         )

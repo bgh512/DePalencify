@@ -115,6 +115,7 @@ HAEM_SOURCE_BY_MODE = {'conc': ('raw', 'od'),
 OCR_SOURCES = ('raw', 'od', 'percent')
 FALLBACK_WITHOUT_OD = {'od': 'raw', 'abs_od': 'abs', 'delta_abs_od': 'delta_abs'}
 HAEM_COLOURS = {'cytc1': '#ff3636',
+                'cytcc': '#ff3636',
                 'cytbh': '#3131ff',
                 'cytbl': '#0d0d87',
                 'cyta605': '#00b050',

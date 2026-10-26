@@ -17,7 +17,7 @@
 | Strings | Use `''` not `""` (docstrings use `"""`) | `'text goes here'` |
 
 - Function names start with the subject so related functions group together: `spectrum_calculator()`, `spectrum_loader()`.
-- Dunder methods (e.g. `__init__`) and `main`are exempt from the `-er` / `-or` rule.
+- Dunder methods (e.g. `__init__`) are exempt from the `-er` / `-or` rule.
 - Units SHOULD be part of the name when they are not obvious: `wavelength_nm`.
 
 ## 2. General Formatting
@@ -289,4 +289,4 @@ Sections 1 to 5 apply to C++ unless stated below. Comments use `//`.
 | Trailing commas | Only in braced initialiser lists and enums (invalid in calls and parameter lists) |
 | Not applicable | Single-quote rule and type annotations |
 
-V1.4 - 25/10/2026
+V1.3 - 23/10/2026

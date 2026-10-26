@@ -16,6 +16,45 @@ from matplotlib.figure import Figure
 # ---- MAIN FUNCTIONS ------------------------------------------------------------------
 
 
+# ---- CONCENTRATION FORMATTER ---------------------------------------------------------
+def concentration_formatter(concentration_um: Any) -> str:
+    """
+    ---- Summary ----
+    Main function to write a concentration given in micromolar with the most readable
+    unit: M from 1 000 000 uM, mM from 1000 uM and uM below that.
+
+    ---- Inputs ----
+    concentration_um : Any
+        Concentration in micromolar (uM); anything float() accepts.
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    str
+        For example '2 uM', '2 mM' (from 2000 uM) or '1.5 mM'; the unit is written
+        with the micro sign. Raises ValueError or TypeError if the value is not a
+        number.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    mM = uM / 1000; M = uM / 1 000 000.
+
+    ---- Helpers ----
+    None.
+    """
+
+    # ---- 1 Choose the unit -----------------------------------------------------------
+    value = float(concentration_um)
+    if abs(value) >= 1_000_000:
+        return f'{value / 1_000_000:g} M'
+    if abs(value) >= 1000:
+        return f'{value / 1000:g} mM'
+    return f'{value:g} µM'
+
+
 # ---- EXCEL SHEET NAMER ---------------------------------------------------------------
 def excel_sheet_namer(name: Any, used: set) -> str:
     """
