@@ -1,6 +1,7 @@
 """Time response figure: waterfalls, example time courses and decompositions."""
 
 # ---- STANDARD IMPORTS ----------------------------------------------------------------
+import math
 from pathlib import Path
 from typing import Any, Optional
 
@@ -9,6 +10,7 @@ from matplotlib.axes import Axes
 from matplotlib.figure import Figure
 from matplotlib.gridspec import GridSpec
 import matplotlib.pyplot as plt
+from matplotlib.transforms import ScaledTranslation
 import numpy as np
 
 # ---- LOCAL IMPORTS -------------------------------------------------------------------
@@ -320,11 +322,12 @@ def _time_axes_styler(ax: Axes, config: dict) -> None:
 def _time_gap_calculator(config: dict,
                          individual_config: dict,
                          label_height_pt: float,
+                         legend_rows: int,
                          ) -> tuple:
     """
     ---- Summary ----
-    Helper function to calculate the row and column gaps of the time response figure
-    from the font sizes and the figure size.
+    Helper function to calculate the gaps of the time response figure: the white space
+    under the first and under the second row, and the gap between columns.
 
     ---- Inputs ----
     config : dict
@@ -334,48 +337,45 @@ def _time_gap_calculator(config: dict,
         config.py.
     label_height_pt : float
         Height of the event labels in points.
+    legend_rows : int
+        Number of text rows of the legends that hang under the second row.
 
     ---- Globals read ----
     None.
 
     ---- Outputs ----
     tuple
-        (hspace, wspace, row gap in points); the first two are GridSpec fractions.
+        (gap under row 1, gap under row 2, column gap), all in points.
 
     ---- Globals mutated ----
     None.
 
     ---- Equations ----
-    row_gap = 1.2 tick + 0.5 unit + label pad + 1.2 label + event label height + 1.0
-    unit; column_gap = 1.2 label + 0.5 unit + 5 x 0.55 tick + 0.5 unit + 1.5 unit +
-    (0.55 x 13 + 4) legend fonts for the example legend (points).
+    x_block = 1.2 tick + 0.5 unit + label pad + 1.2 label; gap 1 = x_block + max(event
+    label height, 1.2 title + 0.8 unit) + 1.0 unit; gap 2 = x_block + legend rows x 1.35
+    legend font + 1.2 unit + 1.2 title + 0.8 unit + 1.0 unit; column_gap = 1.2 label +
+    0.5 unit + 5 x 0.55 tick + 0.5 unit + 1.5 unit.
 
     ---- Helpers ----
-    gap_space_calculator
+    None.
     """
 
     # ---- 1 Read the configuration ----------------------------------------------------
     unit = config['UNIT_PT']
-    width_pt, height_pt = (v * 72.0 for v in config['FIGURE_SIZE'])
     tick, label = config['TICK_FONT_SIZE'], config['AXIS_LABEL_FONT_SIZE']
+    title = 1.2 * config['TITLE_FONT_SIZE'] + 0.8 * unit
 
     # ---- 2 Calculate the gaps --------------------------------------------------------
-    row_gap = (1.2 * tick +
+    x_block = (1.2 * tick +
                0.5 * unit +
                individual_config['TIME_AXIS_LABEL_PAD'] +
-               1.2 * label +
-               label_height_pt +
-               1.0 * unit
+               1.2 * label
                )
-    # the legend of each example sits in the gap, right of the stack
-    legend_width = (0.55 * 13 + 4.0) * config['LEGEND_FONT_SIZE']
-    column_gap = (1.2 * label + 0.5 * unit + 5 * 0.55 * tick + 0.5 * unit + 1.5 * unit
-                  + legend_width
-                  )
-    return (gap_space_calculator(row_gap, height_pt - 6 * unit, 3),
-            gap_space_calculator(column_gap, width_pt - 8 * unit, 2),
-            row_gap,
-            )
+    gap_1 = x_block + max(label_height_pt, title) + 1.0 * unit
+    legend_block = legend_rows * 1.35 * config['LEGEND_FONT_SIZE'] + 1.2 * unit
+    gap_2 = x_block + legend_block + title + 1.0 * unit
+    column_gap = 1.2 * label + 0.5 * unit + 5 * 0.55 * tick + 0.5 * unit + 1.5 * unit
+    return gap_1, gap_2, column_gap
 
 
 # ---- _TITLE STYLER -------------------------------------------------------------------
@@ -420,7 +420,11 @@ def _title_styler(ax: Axes, text: str, config: dict) -> None:
 
 
 # ---- DECOMPOSITION PLOTTER -----------------------------------------------------------
-def decomposition_plotter(ax: Axes, decomposition: dict, config: dict) -> None:
+def decomposition_plotter(ax: Axes,
+                          decomposition: dict,
+                          config: dict,
+                          show_legend: bool = True,
+                          ) -> None:
     """
     ---- Summary ----
     Main function to draw a difference spectrum with its scatter-free fit, residual and
@@ -433,6 +437,8 @@ def decomposition_plotter(ax: Axes, decomposition: dict, config: dict) -> None:
         difference_decomposition of an experiment (DATA_FORMAT.md).
     config : dict
         Figure settings dictionary built in custom_config.py.
+    show_legend : bool
+        True draws the legend inside the axes; False leaves it to the caller.
 
     ---- Globals read ----
     None.
@@ -493,7 +499,8 @@ def decomposition_plotter(ax: Axes, decomposition: dict, config: dict) -> None:
                   fontsize=config['AXIS_LABEL_FONT_SIZE'],
                   )
     _time_axes_styler(ax, config)
-    _legend_drawer(ax, config, config['DECOMPOSITION_LEGEND_LOCATION'])
+    if show_legend:
+        _legend_drawer(ax, config, config['DECOMPOSITION_LEGEND_LOCATION'])
     ax.set_xlim(left=np.min(measured[:, 0]), right=np.max(measured[:, 0]))
 
 
@@ -665,8 +672,9 @@ def time_response_figure_plotter(experiments: dict,
                                  ) -> tuple:
     """
     ---- Summary ----
-    Main function to build the time response figure: waterfalls, then two examples (time
-    course and decomposition).
+    Main function to build the time response figure as a 3 x 3 grid. Plots 1 and 4 are
+    the waterfalls of the two groups, plots 2-3 and 5-6 are two kinetic traces (each
+    spanning two columns) and plots 7, 8 and 9 are three decomposition plots.
 
     ---- Inputs ----
     experiments : dict
@@ -682,14 +690,16 @@ def time_response_figure_plotter(experiments: dict,
 
     ---- Outputs ----
     tuple
-        (fig, axes); axes maps the panel letters 'A'-'F' to axes (the time-course
-        examples give their list of axes).
+        (fig, axes); axes maps the panel letters 'A'-'G' (reading order) to axes; the
+        kinetic traces give their list of axes.
 
     ---- Globals mutated ----
     None.
 
     ---- Equations ----
-    None.
+    The legend of the waterfalls hangs under plot 4 and the legend of the kinetic traces
+    under plots 5-6, both in the gap above the decomposition row; the three
+    decomposition plots share the width left of one legend at the far right.
 
     ---- Helpers ----
     _event_label_height_calculator
@@ -710,17 +720,34 @@ def time_response_figure_plotter(experiments: dict,
     # ---- 1 Validate and select the examples ------------------------------------------
     group_order = tuple(config['GROUP_ORDER'])
     if len(group_order) != 2:
-        raise ValueError('GROUP_ORDER must list exactly two groups (one column each).')
-    if config['WATERFALL_LEGEND_ON'] not in ('all', 'first', 'none'):
-        raise ValueError('WATERFALL_LEGEND_ON must be "all", "first" or "none".')
+        raise ValueError('GROUP_ORDER must list exactly two groups (rows 1 and 2).')
     if len(config['EXAMPLES']) != 2:
         raise ValueError('EXAMPLES must list exactly two (group, hours) examples.')
+    if len(config['DECOMPOSITION_EXAMPLES']) != 3:
+        raise ValueError('DECOMPOSITION_EXAMPLES must list exactly three (group, '
+                         'hours) examples.',
+                         )
     if config['PANEL_LETTER_CASE'] not in ('upper', 'lower'):
         raise ValueError('PANEL_LETTER_CASE must be "upper" or "lower".')
     groups = group_collector(experiments, config)
-    example_picks = [(group,) + _example_finder(groups, group, hours)
+    kinetic_picks = [(group,) + _example_finder(groups, group, hours)
                      for group, hours in config['EXAMPLES']
                      ]
+    decomposition_picks = [(group,) + _example_finder(groups, group, hours)
+                           for group, hours in config['DECOMPOSITION_EXAMPLES']
+                           ]
+    skipped = {float(hours) for hours in config['SKIP_HOURS']}
+    waterfall_groups = {group: [item for item in items
+                                if hours_parser(item[1]['experiment_name']) not in
+                                skipped
+                                ]
+                        for group, items in groups.items()
+                        }
+    empty = [group for group, items in waterfall_groups.items() if not items]
+    if empty:
+        raise ValueError(f"Every time point of {', '.join(empty)} is skipped; nothing "
+                         f'is left for its waterfall.',
+                         )
     example_config = {**individual_config,
                       **config.get('EXAMPLE_PLOT_OVERRIDES', {}),
                       'PLOT_AVERAGING_WINDOWS': True,
@@ -734,99 +761,162 @@ def time_response_figure_plotter(experiments: dict,
                                           in example_config['HAEM_AXIS_LABELS'].items()
                                           }
     label_height = _event_label_height_calculator([experiment
-                                                   for _, _, experiment in example_picks
+                                                   for _, _, experiment in kinetic_picks
                                                    ],
                                                   example_config,
                                                   )
 
-    # ---- 2 Create the figure grid ----------------------------------------------------
-    fig = plt.figure(figsize=config['FIGURE_SIZE'], dpi=config['FIGURE_DPI'])
-    row_hspace, column_wspace, row_gap = _time_gap_calculator(config,
-                                                              example_config,
-                                                              label_height,
-                                                              )
-    grid = GridSpec(3,
-                    2,
-                    figure=fig,
-                    height_ratios=config['HEIGHT_RATIOS'],
-                    width_ratios=config['WIDTH_RATIOS'],
-                    hspace=row_hspace,
-                    wspace=column_wspace,
-                    )
-    # The two waterfalls are stacked in the centre of the bottom row, in a quarter of
-    # the figure width. The gap between them holds the title of the lower one (and the
-    # wavelength axis is written once, under the lower, when they share it).
-    # ---- 3 Draw the waterfalls -------------------------------------------------------
-    unit = config['UNIT_PT']
-    ratios = config['HEIGHT_RATIOS']
-    waterfall_row_pt = (config['FIGURE_SIZE'][1] * 72.0 - 6 * unit - 2 * row_gap
-                        ) * ratios[2] / sum(ratios)
-    stack_gap = 1.2 * config['TITLE_FONT_SIZE'] + 0.8 * unit + 1.0 * unit
-    if config['WATERFALL_SHARE_X_AXIS']:
-        stack_gap += 0.5 * unit  # the upper panel keeps its tick marks
-    else:
-        stack_gap += (1.2 * config['TICK_FONT_SIZE'] +
-                      1.0 * unit +
-                      1.2 * config['AXIS_LABEL_FONT_SIZE']
-                      )
-    fraction = config['WATERFALL_WIDTH_FRACTION']
-    centred = grid[2, :].subgridspec(1,
-                                     3,
-                                     width_ratios=[(1 - fraction) / 2,
-                                                   fraction,
-                                                   (1 - fraction) / 2,
-                                                   ],
-                                     wspace=0,
-                                     )
-    stacked = centred[0, 1].subgridspec(2,
-                                        1,
-                                        hspace=gap_space_calculator(stack_gap,
-                                                                    waterfall_row_pt,
-                                                                    2,
-                                                                    ),
-                                        )
-    axes, panels = {}, []
-    for index, group in enumerate(group_order):
-        shared = config['WATERFALL_SHARE_X_AXIS'] and index == 1
-        ax = fig.add_subplot(stacked[index, 0], sharex=axes['E'] if shared else None)
-        _title_styler(ax, config['GROUP_TITLES'].get(group, group), config)
-        waterfall_plotter(ax,
-                          groups[group],
-                          config,
-                          show_legend=config['WATERFALL_LEGEND_ON'] == 'all',
+    # ---- 2 Size the legends and the gaps ---------------------------------------------
+    unit, font = config['UNIT_PT'], config['LEGEND_FONT_SIZE']
+    width_pt, height_pt = (v * 72.0 for v in config['FIGURE_SIZE'])
+    haem_count = len(decomposition_picks[0][2]['difference_decomposition']
+                     ['haem_names']
+                     )
+    waterfall_labels = [label for label, _ in waterfall_groups[group_order[0]]]
+    kinetic_count = 2 + haem_count
+    entry_width = (2.8 + 0.55 * max(len(label) for label in waterfall_labels)) * font
+    kinetic_entry_width = (2.8 + 0.55 * 13) * font
+    column_gap = _time_gap_calculator(config, example_config, label_height, 1)[2]
+    column_width = (width_pt - 8 * unit - 2 * column_gap) / 3.0
+    fits = int(column_width // entry_width)
+    waterfall_columns = max(1, min(len(waterfall_labels), fits))
+    kinetic_columns = max(1, min(kinetic_count,
+                                 int((2 * column_width + column_gap)
+                                     // kinetic_entry_width),
+                                 ),
                           )
-        if config['WATERFALL_SHARE_X_AXIS'] and index == 0:
-            ax.set_xlabel('')
-            ax.tick_params(axis='x', labelbottom=False)
-        axes['EF'[index]] = ax
+    legend_rows = max(math.ceil(len(waterfall_labels) / waterfall_columns),
+                      math.ceil(kinetic_count / kinetic_columns),
+                      )
+    gap_1, gap_2, column_gap = _time_gap_calculator(config,
+                                                    example_config,
+                                                    label_height,
+                                                    legend_rows,
+                                                    )
+    below_pt = (1.2 * config['TICK_FONT_SIZE'] + 0.5 * unit +
+                example_config['TIME_AXIS_LABEL_PAD'] +
+                1.2 * config['AXIS_LABEL_FONT_SIZE'] + 0.3 * unit
+                )
 
-    # ---- 4 Draw the examples ---------------------------------------------------------
-    for row, (group, label, experiment) in enumerate(example_picks):
-        known = {id(ax) for ax in fig.axes}
+    # ---- 3 Create the figure grid ----------------------------------------------------
+    fig = plt.figure(figsize=config['FIGURE_SIZE'], dpi=config['FIGURE_DPI'])
+    content_pt = height_pt - 6 * unit - gap_1 - gap_2
+    weights = config['HEIGHT_RATIOS']
+    heights = [content_pt * weight / sum(weights) for weight in weights]
+    outer = GridSpec(5,
+                     1,
+                     figure=fig,
+                     height_ratios=[heights[0], gap_1, heights[1], gap_2, heights[2]],
+                     hspace=0.0,
+                     )
+    wspace = gap_space_calculator(column_gap, width_pt - 8 * unit, 3)
+    rows = [outer[0].subgridspec(1, 3, wspace=wspace),
+            outer[2].subgridspec(1, 3, wspace=wspace),
+            ]
+    # The decomposition row: the three plots are squeezed into the width left of one
+    # legend at the far right.
+    legend_width = (2.6 + 0.55 * 8 + 1.4) * font + 1.0 * unit
+    bottom = outer[4].subgridspec(1,
+                                  2,
+                                  width_ratios=[width_pt - 8 * unit - legend_width,
+                                                legend_width,
+                                                ],
+                                  wspace=0.0,
+                                  )
+    decomposition_grid = bottom[0, 0].subgridspec(
+        1,
+        3,
+        wspace=gap_space_calculator(column_gap,
+                                    width_pt - 8 * unit - legend_width,
+                                    3,
+                                    ),
+    )
+
+    # ---- 4 Draw the waterfalls and the kinetic traces --------------------------------
+    axes, panels = {}, []
+    for row, group in enumerate(group_order):
+        ax = fig.add_subplot(rows[row][0, 0])
+        _title_styler(ax, config['GROUP_TITLES'].get(group, group), config)
+        waterfall_plotter(ax, waterfall_groups[group], config, show_legend=False)
+        letter = 'AC'[row]
+        axes[letter] = ax
+        panels.append((letter, ax, [ax]))
+
+        picked_group, label, experiment = kinetic_picks[row]
+        known = {id(other) for other in fig.axes}
         stack, _ = experiment_drawer(fig,
-                                     grid[row, 0],
+                                     rows[row][0, 1:3],
                                      _example_viewer(experiment),
                                      example_config,
                                      )
         # the panels and the invisible axes that carries the shared label
-        members = [ax for ax in fig.axes if id(ax) not in known]
-        stack_legend_drawer(stack, example_config)
-        decomposition_ax = fig.add_subplot(grid[row, 1])
+        members = [other for other in fig.axes if id(other) not in known]
+        letter = 'BD'[row]
+        axes[letter] = stack
+        panels.append((letter, stack[0], members))
+
+    # ---- 5 Draw the decomposition plots ----------------------------------------------
+    decomposition_axes = []
+    for column, (group, label, experiment) in enumerate(decomposition_picks):
+        ax = fig.add_subplot(decomposition_grid[0, column])
         group_title = config['GROUP_TITLES'].get(group, group)
-        title = config['EXAMPLE_TITLE_FORMAT'].format(group=group_title, time=label)
-        _title_styler(decomposition_ax, title, config)
-        decomposition_plotter(decomposition_ax,
+        _title_styler(ax,
+                      config['EXAMPLE_TITLE_FORMAT'].format(group=group_title,
+                                                            time=label,
+                                                            ),
+                      config,
+                      )
+        decomposition_plotter(ax,
                               experiment['difference_decomposition'],
                               config,
+                              show_legend=False,
                               )
-        left_letter, right_letter = ('AB', 'CD')[row]
-        axes[left_letter], axes[right_letter] = stack, decomposition_ax
-        panels += [(left_letter, stack[0], members),
-                   (right_letter, decomposition_ax, [decomposition_ax]),
-                   ]
+        decomposition_axes.append(ax)
+        letter = 'EFG'[column]
+        axes[letter] = ax
+        panels.append((letter, ax, [ax]))
 
-    # ---- 5 Fit margins and add panel letters -----------------------------------------
-    panels = panels + [(letter, axes[letter], [axes[letter]]) for letter in 'EF']
+    # ---- 6 Draw the legends ----------------------------------------------------------
+    # The waterfall legend hangs under plot 4 and the kinetic legend under plots 5-6,
+    # both in the gap above the decomposition row.
+    handles, labels = axes['A'].get_legend_handles_labels()
+    lower = axes['C']
+    legend = lower.legend(handles,
+                          labels,
+                          loc='upper center',
+                          bbox_to_anchor=(0.5, 0.0),
+                          bbox_transform=lower.transAxes + ScaledTranslation(
+                              0, -below_pt / 72.0, fig.dpi_scale_trans),
+                          ncol=waterfall_columns,
+                          frameon=config['LEGEND_FRAME'],
+                          fontsize=font,
+                          borderaxespad=0,
+                          )
+    if config['LEGEND_FRAME']:
+        legend.get_frame().set_linewidth(config['THIN_LINE_WIDTH'])
+    legend = stack_legend_drawer(axes['D'],
+                                 example_config,
+                                 below_pt=below_pt,
+                                 columns=kinetic_columns,
+                                 )
+    if legend is not None and config['LEGEND_FRAME']:
+        legend.get_frame().set_linewidth(config['THIN_LINE_WIDTH'])
+    legend_ax = fig.add_subplot(bottom[0, 1], frameon=False)
+    legend_ax.axis('off')
+    handles, labels = decomposition_axes[-1].get_legend_handles_labels()
+    legend = legend_ax.legend(handles,
+                              labels,
+                              loc='center left',
+                              bbox_to_anchor=(0.0, 0.5),
+                              frameon=config['LEGEND_FRAME'],
+                              fontsize=font,
+                              borderaxespad=0,
+                              )
+    if config['LEGEND_FRAME']:
+        legend.get_frame().set_linewidth(config['THIN_LINE_WIDTH'])
+
+    # ---- 7 Fit margins and add panel letters -----------------------------------------
+    panels.sort(key=lambda panel: panel[0])
     suptitle = (fig.suptitle(config['FIGURE_TITLE'],
                              fontsize=config['SUPTITLE_FONT_SIZE'],
                              fontweight='bold',
@@ -836,17 +926,6 @@ def time_response_figure_plotter(experiments: dict,
                 )
     pad, gap = config['EDGE_PAD_PT'], config['TITLE_GAP_PT']
     figure_canvas_fitter(fig, pad, suptitle, gap)
-    if config['WATERFALL_LEGEND_ON'] == 'first':
-        # One legend in the white space right of the waterfalls, centred vertically
-        # on the gap between them (in the upper axes' coordinates).
-        upper, lower = axes['E'].get_position(), axes['F'].get_position()
-        centre = (upper.y0 + lower.y1) / 2
-        _legend_drawer(axes['E'],
-                       config,
-                       'center left',
-                       config['WATERFALL_LEGEND_COLUMNS'],
-                       anchor=(1.03, (centre - upper.y0) / upper.height),
-                       )
     if config['PANEL_LETTERS']:
         panel_letter_adder(fig,
                            panels,

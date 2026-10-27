@@ -267,17 +267,17 @@ def _baseline_bar_plotter(ax: Axes,
 
 
 # ---- _BLOCK GAP CALCULATOR -----------------------------------------------------------
-def _block_gap_calculator(config: dict, n_blocks: int, n_columns: int) -> tuple:
+def _block_gap_calculator(config: dict, blocks: list, n_columns: int) -> tuple:
     """
     ---- Summary ----
-    Helper function to calculate the gap between the blocks and between the response
-    columns of the publication figure.
+    Helper function to calculate the gap below each block of the publication figure
+    (each gap is sized for what it holds) and the gap between the response columns.
 
     ---- Inputs ----
     config : dict
         Figure settings dictionary built in custom_config.py.
-    n_blocks : int
-        Number of blocks stacked vertically.
+    blocks : list
+        Block names from top to bottom ('baseline', 'ocr_response', 'haem_response').
     n_columns : int
         Number of addition-order columns.
 
@@ -286,15 +286,16 @@ def _block_gap_calculator(config: dict, n_blocks: int, n_columns: int) -> tuple:
 
     ---- Outputs ----
     tuple
-        (hspace, wspace) as GridSpec fractions.
+        (gaps in points, one per block but the last; wspace as a GridSpec fraction).
 
     ---- Globals mutated ----
     None.
 
     ---- Equations ----
-    block_gap = 2.4 xtick + 0.5 unit + 1.2 title + 0.8 unit + 1.0 unit; column_gap = 5 x
-    0.55 tick + 0.5 unit + 1.5 unit (points). gap_to_space converts a gap in points to a
-    GridSpec fraction.
+    A gap above the first response block = x tick labels + 0.5 unit + title and legend
+    row + 1.0 unit. The gap between the OCR and haem responses = two-line tick labels +
+    0.5 unit + the significance bars' headroom + 0.5 unit. column_gap = 5 x 0.55 tick +
+    0.5 unit + 1.5 unit (points).
 
     ---- Helpers ----
     gap_space_calculator
@@ -302,18 +303,24 @@ def _block_gap_calculator(config: dict, n_blocks: int, n_columns: int) -> tuple:
 
     # ---- 1 Read the configuration ----------------------------------------------------
     unit = config['UNIT_PT']
-    width_pt, height_pt = (v * 72.0 for v in config['FIGURE_SIZE'])
+    width_pt = config['FIGURE_SIZE'][0] * 72.0
     tick, xtick, title = (config['RESPONSE_TICK_FONT_SIZE'],
                           config['RESPONSE_XTICK_FONT_SIZE'],
                           config['TITLE_FONT_SIZE'],
                           )
+    legend_row = 1.2 * max(title, 1.8 * config['RESPONSE_LEGEND_FONT_SIZE'])
 
     # ---- 2 Calculate the gaps --------------------------------------------------------
-    block_gap = 2.4 * xtick + 0.5 * unit + 1.2 * title + 0.8 * unit + 1.0 * unit
+    gaps = []
+    for upper, lower in zip(blocks, blocks[1:]):
+        if upper == 'ocr_response':
+            gaps.append(2.4 * xtick + 0.5 * unit + config['RESPONSE_TEST_HEADROOM_PT']
+                        + 0.5 * unit
+                        )
+        else:
+            gaps.append(1.2 * xtick + 0.5 * unit + legend_row + 1.0 * unit)
     column_gap = 5 * 0.55 * tick + 0.5 * unit + 1.5 * unit
-    return (gap_space_calculator(block_gap, height_pt - 6 * unit, n_blocks),
-            gap_space_calculator(column_gap, width_pt - 8 * unit, n_columns),
-            )
+    return gaps, gap_space_calculator(column_gap, width_pt - 8 * unit, n_columns)
 
 
 # ---- _COLUMN CHOOSER -----------------------------------------------------------------
@@ -788,6 +795,7 @@ def _haem_block_plotter(fig: Figure,
                         rows: list,
                         haem_source: str,
                         tests: Optional[list] = None,
+                        bars_above: bool = False,
                         ) -> tuple:
     """
     ---- Summary ----
@@ -817,6 +825,9 @@ def _haem_block_plotter(fig: Figure,
         Haem source key, for example 'delta_abs_od'.
     tests : Optional[list]
         List collecting t-test comparisons, or None to skip the tests.
+    bars_above : bool
+        True draws the top row's significance bars in the white space above the block
+        (between it and the block above) instead of inside the axes.
 
     ---- Globals read ----
     None.
@@ -836,6 +847,7 @@ def _haem_block_plotter(fig: Figure,
     _haem_label_pad_calculator
     _legend_handle_builder
     _measurement_finder
+    _outside_bar_drawer
     _reference_level_finder
     _response_axes_preparer
     _response_series_drawer
@@ -921,6 +933,7 @@ def _haem_block_plotter(fig: Figure,
                                         f"Haem response {row['label']}: "
                                         f'{ORDER_TITLES[order]}',
                                         tests,
+                                        outside=bars_above and r == 0,
                                         )
             if not drawn:
                 print(f"Warning: no data for haem {row['haem']!r} ("
@@ -935,6 +948,9 @@ def _haem_block_plotter(fig: Figure,
                         )
         if config['SHARE_Y_BETWEEN_ORDERS'] and len(orders) > 1:
             _row_ylim_sharer(grid_axes[r])
+        if bars_above and r == 0:
+            for ax in grid_axes[0]:
+                _outside_bar_drawer(ax, config)
         if r > 0:
             for ax in grid_axes[r]:
                 hider = _HideTopTickLabels(config['RESPONSE_TICK_FONT_SIZE'])
@@ -1506,6 +1522,42 @@ def _ocr_block_plotter(fig: Figure,
     return axes
 
 
+# ---- _OUTSIDE BAR DRAWER -------------------------------------------------------------
+def _outside_bar_drawer(ax: Axes, config: dict) -> None:
+    """
+    ---- Summary ----
+    Helper function to draw the significance bars stored by _response_window_tester in
+    the white space just above an axes, so the plot keeps its full height.
+
+    ---- Inputs ----
+    ax : Axes
+        Response panel whose y range is final.
+    config : dict
+        Figure settings dictionary built in custom_config.py.
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    None
+        Nothing.
+
+    ---- Globals mutated ----
+    None. Draws on ``ax`` (side effect).
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    _test_bar_drawer
+    """
+
+    half = config['RESPONSE_GROUP_DODGE'] / 2.0
+    top = ax.get_ylim()[1]
+    for centre, text in getattr(ax, 'outside_marks', []):
+        _test_bar_drawer(ax, centre - half, centre + half, top, text, config)
+
+
 # ---- _P VALUE ADJUSTER ---------------------------------------------------------------
 def _p_value_adjuster(p_values: Iterable, method: str) -> np.ndarray:
     """
@@ -1867,6 +1919,7 @@ def _response_window_tester(ax: Axes,
                             config: dict,
                             panel_name: str,
                             tests: list,
+                            outside: bool = False,
                             ) -> None:
     """
     ---- Summary ----
@@ -1892,6 +1945,9 @@ def _response_window_tester(ax: Axes,
         Panel name written to the test table.
     tests : list
         List collecting one dictionary per t-test comparison.
+    outside : bool
+        True keeps the axis range as it is and stores the marks on ``ax`` for
+        _outside_bar_drawer, which draws them in the space above the axes.
 
     ---- Globals read ----
     None.
@@ -1902,7 +1958,7 @@ def _response_window_tester(ax: Axes,
 
     ---- Globals mutated ----
     None. Appends one dictionary per comparison to ``tests`` and draws on ``ax`` (side
-    effects).
+    effects); with ``outside`` it sets ``ax.outside_marks`` instead of drawing.
 
     ---- Equations ----
     Equal-variance Student t-test per window; p values adjusted across the windows of
@@ -1986,6 +2042,9 @@ def _response_window_tester(ax: Axes,
                           ),
                          )
     if not marks:
+        return
+    if outside:
+        ax.outside_marks = [(x[result['index']], text) for result, text in marks]
         return
     # Headroom so the bars and stars sit inside the axes: they need a fixed number of
     # points, so work out what fraction of the
@@ -2560,8 +2619,13 @@ def exemplar_figure_plotter(experiments: dict,
                                 fontsize=config['SUPTITLE_FONT_SIZE'],
                                 fontweight='bold',
                                 )
-    for stack in row_axes.values():
-        stack_legend_drawer(stack, individual_config)
+    # One legend for the whole figure, centred between the top and bottom rows.
+    rows_down = [row_axes[r] for r in sorted(row_axes)]
+    if rows_down:
+        stack_legend_drawer(rows_down[0],
+                            individual_config,
+                            bottom=rows_down[-1][-1],
+                            )
     _figure_finisher(fig, config, panels, suptitle)
     print('  Exemplar panels: ' + ', '.join(f'{letter} = {name}'
                                             for letter, name in letter_names.items()
@@ -2640,18 +2704,22 @@ def publication_figure_plotter(experiments: dict,
         _response_metric_checker(config['HAEM_RESPONSE_METRIC'], haem_source)
     # ---- 2 Create the figure grid ----------------------------------------------------
     fig = plt.figure(figsize=config['FIGURE_SIZE'], dpi=config['FIGURE_DPI'])
-    block_hspace, column_wspace = _block_gap_calculator(config,
-                                                        len(blocks),
-                                                        len(orders),
-                                                        )
-    outer = fig.add_gridspec(nrows=len(blocks),
+    block_gaps, column_wspace = _block_gap_calculator(config, blocks, len(orders))
+    content_pt = (config['FIGURE_SIZE'][1] * 72.0 - 6 * config['UNIT_PT']
+                  - sum(block_gaps)
+                  )
+    weights = [config['HEIGHT_RATIOS'][name] for name in blocks]
+    ratios = []
+    for index, weight in enumerate(weights):
+        ratios.append(content_pt * weight / sum(weights))
+        if index < len(block_gaps):
+            ratios.append(block_gaps[index])  # an empty spacer row of that height
+    outer = fig.add_gridspec(nrows=len(ratios),
                              ncols=1,
-                             hspace=block_hspace,
-                             height_ratios=[config['HEIGHT_RATIOS'][name]
-                                            for name in blocks
-                                            ],
+                             hspace=0.0,
+                             height_ratios=ratios,
                              )
-    cells = dict(zip(blocks, (outer[i] for i in range(len(blocks)))))
+    cells = dict(zip(blocks, (outer[2 * i] for i in range(len(blocks)))))
     letters, letter_names, panels, tests = iter('ABCDEFGHIJKLMNOPQRSTUVWXYZ',
                                                 ), {}, [], []
     def _panel_labeller(main_ax: Axes, members: list, name: str) -> None:
@@ -2730,6 +2798,8 @@ def publication_figure_plotter(experiments: dict,
                                                        haem_rows,
                                                        haem_source,
                                                        tests,
+                                                       bars_above='ocr_response'
+                                                       in blocks[:blocks.index(block)],
                                                        )
             for column, order in enumerate(orders):  # one letter per addition order
                 members = [row[column] for row in axes_haem]
@@ -2741,22 +2811,25 @@ def publication_figure_plotter(experiments: dict,
                                 f'haem response {ORDER_TITLES[order]}',
                                 )
 
-    # ---- 4 Add one title per column and one legend -----------------------------------
+    # ---- 4 Add one title and one legend per column -----------------------------------
     # The addition order heads each column, once, above its top response panel; the
-    # group legend shares that row at the right.
+    # group legend, in a box, shares that row at the right. Both sit as close to the
+    # axes as they can.
     heads = axes_ocr or (list(axes_haem[0]) if axes_haem else [])
     for order, ax in zip(orders, heads):
-        ax.set_title(ORDER_TITLES[order])
-    if heads:
-        heads[-1].legend(handles=_legend_handle_builder(strains, config),
-                         loc='lower right',
-                         bbox_to_anchor=(1.0, 1.0),
-                         ncol=len(strains),
-                         fontsize=config['RESPONSE_LEGEND_FONT_SIZE'],
-                         frameon=False,
-                         borderaxespad=0.2,
-                         columnspacing=1.0,
-                         )
+        ax.set_title(ORDER_TITLES[order], pad=2)
+        ax.legend(handles=_legend_handle_builder(strains, config),
+                  loc='lower right',
+                  bbox_to_anchor=(1.0, 1.0),
+                  ncol=len(strains),
+                  fontsize=config['RESPONSE_LEGEND_FONT_SIZE'],
+                  frameon=True,
+                  edgecolor='black',
+                  fancybox=False,
+                  borderaxespad=0.0,
+                  borderpad=0.3,
+                  columnspacing=1.0,
+                  ).get_frame().set_linewidth(config['THIN_LINE_WIDTH'])
 
     # ---- 5 Fit margins and add panel letters -----------------------------------------
     suptitle = None

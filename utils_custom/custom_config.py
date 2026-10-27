@@ -87,13 +87,14 @@ def exemplar_config_builder(cfg: Config, answers: dict) -> dict:
             'CROP_BEFORE_FIRST_ADDITION_MINUTES': 0.5,
             'TIME_AXIS_LABEL': 'Time from baseline (min)',
             'RUN_NAME_WATERMARK': answers.get('ex_watermark', True),
-            'INDIVIDUAL_OVERRIDES': {'PANEL_HEIGHT_RATIOS': {'oxygen': 3,
-                                                             'vo2': 4,
-                                                             'haem': 5,
+            # [O2] : OCR is 1 : 1 and every haem panel is 0.8 of the OCR panel.
+            'INDIVIDUAL_OVERRIDES': {'PANEL_HEIGHT_RATIOS': {'oxygen': 1,
+                                                             'vo2': 1,
+                                                             'haem': 1,
                                                              },
-                                     'EQUAL_PANEL_HEIGHTS': True,
+                                     'HAEM_PANEL_WEIGHT': 0.8,
+                                     'EQUAL_PANEL_HEIGHTS': False,
                                      'EVENT_LABEL_ROTATION': 30,
-                                     'LEGEND_LOCATIONS': {'oxygen': 'center right'},
                                      },
             'FIGURE_SIZE': size,
             'FIGURE_DPI': cfg.FIGURE_DPI,
@@ -374,7 +375,8 @@ def time_response_config_builder(cfg: Config, answers: dict, haem_names: list,) 
     cfg : Config
         Figure style derived from the answers (config.py).
     answers : dict
-        Terminal answers; uses tr_groups, tr_examples, tr_columns and tr_height.
+        Terminal answers; uses tr_groups, tr_examples, tr_decompositions,
+        tr_skip_hours, tr_columns and tr_height.
     haem_names : list
         Haem names of the fit, used to colour the decomposition panels.
 
@@ -411,8 +413,14 @@ def time_response_config_builder(cfg: Config, answers: dict, haem_names: list,) 
             'GROUP_ORDER': groups,
             'GROUP_TITLES': {group: group.capitalize() for group in groups},
             'TIME_LABEL_FORMAT': '{hours:g} hours',
+            # The two kinetic traces, the three decomposition plots and the hours the
+            # waterfalls leave out.
             'EXAMPLES': tuple((group, hours) for group, hours in answers['tr_examples']
                               ),
+            'DECOMPOSITION_EXAMPLES': tuple((group, hours) for group, hours
+                                            in answers['tr_decompositions']
+                                            ),
+            'SKIP_HOURS': tuple(answers['tr_skip_hours']),
             'EXAMPLE_TITLE_FORMAT': '{group}, {time}',
             'EXAMPLE_PLOT_OVERRIDES': {'EVENT_LABEL_ROTATION': 30,
                                        'PLOT_VO2': False,
@@ -431,8 +439,7 @@ def time_response_config_builder(cfg: Config, answers: dict, haem_names: list,) 
             'EDGE_PAD_PT': style['edge_pad'],
             'TITLE_GAP_PT': style['title_gap'],
             'THIN_LINE_WIDTH': style['thin_line_width'],
-            'HEIGHT_RATIOS': (1.5, 1.5, 2.6),
-            'WIDTH_RATIOS': (1, 1),
+            'HEIGHT_RATIOS': (2.2, 2.2, 1.6),
             'PANEL_LETTERS': True,
             'PANEL_LETTER_CASE': spec['panel_letter_case'],
             'PANEL_LETTER_FONT_SIZE': fonts['panel_letter'],
@@ -445,16 +452,13 @@ def time_response_config_builder(cfg: Config, answers: dict, haem_names: list,) 
             'WATERFALL_BASELINE_X_MIN': 415,
             'WATERFALL_BASELINE_X_MAX': 670,
             'WATERFALL_BASELINE_DEGREE': 1,
-            'WATERFALL_Y_LABEL': 'Offset ΔD',
-            'WATERFALL_WIDTH_FRACTION': 0.25,
+            'WATERFALL_Y_LABEL': 'Offset Δ\nattenuation',
             'HAEM_WINDOW_HALF_WIDTH_NM': 2.5,
             'HAEM_WINDOW_ALPHA': 0.15,
             'WATERFALL_LEGEND_LOCATION': 'lower right',
             'WATERFALL_LEGEND_COLUMNS': 1,
             'WATERFALL_LEGEND_OUTSIDE': True,
-            'WATERFALL_LEGEND_ON': 'first',
-            'WATERFALL_SHARE_X_AXIS': True,
-            'DECOMPOSITION_Y_LABEL': 'ΔD',
+            'DECOMPOSITION_Y_LABEL': 'Δ attenuation',
             'DECOMPOSITION_LEGEND_LOCATION': 'upper right',
             'HAEM_COLOURS': haem_colour_mapper(haem_names),
             'TICK_FONT_SIZE': fonts['tick'],

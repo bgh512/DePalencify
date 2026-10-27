@@ -39,7 +39,10 @@ choosing either one switches the decomposition on.
 File names need a group word and the hours: `control_7hours`,
 `knockdown_24hours`. Spectra are averaged in the event windows, the last two
 windows are subtracted (penultimate minus final), and that difference spectrum is
-decomposed into haems. Output: `time_response_figure.*` in the results folder and
+decomposed into haems. The figure is a 3 x 3 grid: a waterfall of each group (plots 1
+and 4), two kinetic traces (2-3 and 5-6) and three decomposition plots (7-9), each
+chosen by its own question; time points can be skipped in the waterfalls. Output:
+`time_response_figure.*` in the results folder and
 `<group>_difference_spectra.csv`, `<group>_haem_percentages.csv` in `triplicate_data/`.
 
 ### Haem and OCR response

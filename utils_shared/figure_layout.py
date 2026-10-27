@@ -20,6 +20,7 @@ from matplotlib.axes import Axes
 from matplotlib.figure import Figure
 from matplotlib.font_manager import FontProperties
 from matplotlib.textpath import TextPath
+from matplotlib.transforms import ScaledTranslation
 
 
 # ---- CONSTANTS -----------------------------------------------------------------------
@@ -494,13 +495,19 @@ def panel_letter_adder(fig: Figure,
 
 
 # ---- STACK LEGEND DRAWER -------------------------------------------------------------
-def stack_legend_drawer(axes: List[Axes], config: dict) -> Optional[Any]:
+def stack_legend_drawer(axes: List[Axes],
+                        config: dict,
+                        bottom: Optional[Axes] = None,
+                        below_pt: Optional[float] = None,
+                        columns: int = 1,
+                        ) -> Optional[Any]:
     """
     ---- Summary ----
     Main function to draw one legend for a vertical stack of axes (an individual
-    experiment plot), in the white space to the right of the stack and centred on its
-    height. It holds every labelled line of the stack (set and measured O2, then each
-    haem) except the OCR trace.
+    experiment plot). By default it sits in the white space to the right of the stack,
+    centred on the height of the stack (or on the span down to ``bottom``); with
+    ``below_pt`` it sits centred under the stack instead. It holds every labelled line
+    of the stack (set and measured O2, then each haem) except the OCR trace.
 
     ---- Inputs ----
     axes : List[Axes]
@@ -508,6 +515,14 @@ def stack_legend_drawer(axes: List[Axes], config: dict) -> Optional[Any]:
     config : dict
         Settings; uses LEGEND_FONT_SIZE, LEGEND_FRAME, LEGEND_FRAME_LINE_WIDTH
         (optional) and VO2_LABEL (optional).
+    bottom : Optional[Axes]
+        Lowest axes of the span to centre on (for example the bottom row of a grid of
+        stacks), or None for the stack itself.
+    below_pt : Optional[float]
+        When set, the legend hangs this many points below the stack's lowest axes
+        instead of sitting at the right.
+    columns : int
+        Number of legend columns.
 
     ---- Globals read ----
     None.
@@ -517,7 +532,7 @@ def stack_legend_drawer(axes: List[Axes], config: dict) -> Optional[Any]:
         The legend, or None when the stack has no labelled lines.
 
     ---- Globals mutated ----
-    None. Adds a legend to the top axes (side effect).
+    None. Adds a legend to an axes of the stack (side effect).
 
     ---- Equations ----
     None.
@@ -539,17 +554,32 @@ def stack_legend_drawer(axes: List[Axes], config: dict) -> Optional[Any]:
         return None
 
     # ---- 2 Draw the legend -----------------------------------------------------------
-    # Anchored to the top axes, at the vertical middle of the whole stack.
-    top, bottom = axes[0].get_position(), axes[-1].get_position()
-    middle = ((top.y1 + bottom.y0) / 2 - top.y0) / top.height
-    legend = axes[0].legend(handles,
-                            labels,
-                            loc='center left',
-                            bbox_to_anchor=(1.02, middle),
-                            borderaxespad=0,
-                            frameon=config['LEGEND_FRAME'],
-                            fontsize=config['LEGEND_FONT_SIZE'],
-                            )
+    options = {'frameon': config['LEGEND_FRAME'],
+               'fontsize': config['LEGEND_FONT_SIZE'],
+               'ncol': columns,
+               'borderaxespad': 0,
+               }
+    if below_pt is not None:
+        anchor_ax = axes[-1]
+        shift = ScaledTranslation(0, -below_pt / 72.0, anchor_ax.figure.dpi_scale_trans)
+        legend = anchor_ax.legend(handles,
+                                  labels,
+                                  loc='upper center',
+                                  bbox_to_anchor=(0.5, 0.0),
+                                  bbox_transform=anchor_ax.transAxes + shift,
+                                  **options,
+                                  )
+    else:
+        # Anchored to the top axes, at the vertical middle of the whole span.
+        top = axes[0].get_position()
+        low = (bottom or axes[-1]).get_position()
+        middle = ((top.y1 + low.y0) / 2 - top.y0) / top.height
+        legend = axes[0].legend(handles,
+                                labels,
+                                loc='center left',
+                                bbox_to_anchor=(1.02, middle),
+                                **options,
+                                )
     if config['LEGEND_FRAME']:
         legend.get_frame().set_linewidth(config.get('LEGEND_FRAME_LINE_WIDTH', 0.4))
     return legend

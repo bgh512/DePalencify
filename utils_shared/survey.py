@@ -1029,7 +1029,7 @@ def multi_experiment_asker(summaries: List[dict],
                         'height': 'ho_ex_height',
                         'mode': 'ex_size_mode',
                         },
-                       (1.5, 0.75),
+                       (2, 0.75),
                        depth=2,
                        )
             answers['plot_exemplar'] = True

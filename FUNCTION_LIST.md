@@ -43,7 +43,7 @@ Generated from the source. Names starting with `_` are private helpers.
 - `figure_style_checker`: Main function to list warnings for fonts outside the journal range or a figure taller than the journal allows.
 - `gap_space_calculator`: Main function to calculate the GridSpec wspace or hspace that leaves a given gap between equal cells.
 - `panel_letter_adder`: Main function to write each panel letter just above the top edge of its panel's main axes, to the left of everything the panel draws on that side.
-- `stack_legend_drawer`: Main function to draw one legend for a vertical stack of axes (an individual experiment plot), in the white space to the right of the stack and centred on its height. It holds every labelled line of the stack (set and measured O2, then each haem) except the OCR trace.
+- `stack_legend_drawer`: Main function to draw one legend for a vertical stack of axes (an individual experiment plot). By default it sits in the white space to the right of the stack, centred on the height of the stack (or on the span down to ``bottom``); with ``below_pt`` it sits centred under the stack instead. It holds every labelled line of the stack (set and measured O2, then each haem) except the OCR trace.
 - `text_extent_calculator`: Main function to calculate the width and height of the bounding box of a piece of text after rotating it.
 
 ## utils_shared/helpers.py
@@ -203,7 +203,7 @@ Generated from the source. Names starting with `_` are private helpers.
 
 - `_axes_styler`: Helper function to apply the tick, grid and spine style of the response and baseline panels.
 - `_baseline_bar_plotter`: Helper function to draw the baseline OCR (average0) bar chart per group, with every run overlaid and a Student t-test bracket between the two groups.
-- `_block_gap_calculator`: Helper function to calculate the gap between the blocks and between the response columns of the publication figure.
+- `_block_gap_calculator`: Helper function to calculate the gap below each block of the publication figure (each gap is sized for what it holds) and the gap between the response columns.
 - `_column_chooser`: Helper function to choose the OCR column: the preferred one if set, else VoO2, else the first available.
 - `_condition_indexer`: Helper function to map each (strain, order) pair to its condition name in the triplicate results.
 - `_crop_start_finder`: Helper function to find the time at which an exemplar crop begins.
@@ -224,6 +224,7 @@ Generated from the source. Names starting with `_` are private helpers.
 - `_measurement_finder`: Helper function to find the column matching a wanted name, ignoring case and punctuation.
 - `_metric_field_selector`: Helper function to name the keys of the triplicate statistics used by a response metric.
 - `_ocr_block_plotter`: Helper function to draw the OCR response (percent of each run's baseline, mean and SEM across runs), one axes per addition order.
+- `_outside_bar_drawer`: Helper function to draw the significance bars stored by _response_window_tester in the white space just above an axes, so the plot keeps its full height.
 - `_p_value_adjuster`: Helper function to adjust a list of p values for multiple comparisons.
 - `_reference_level_finder`: Helper function to find the height of the dashed reference line of the haem response.
 - `_reference_selector`: Helper function to pick, for each addition order, the first run of the first available group (used for the event tick labels).
@@ -271,13 +272,13 @@ Generated from the source. Names starting with `_` are private helpers.
 - `_haem_window_drawer`: Helper function to shade, behind the spectra, a window around the peak of every haem in the haem's own colour, to show where each haem should appear.
 - `_legend_drawer`: Helper function to draw a legend in the journal style: small text and an optional thin box.
 - `_time_axes_styler`: Helper function to apply the tick direction, label size and spine style.
-- `_time_gap_calculator`: Helper function to calculate the row and column gaps of the time response figure from the font sizes and the figure size.
+- `_time_gap_calculator`: Helper function to calculate the gaps of the time response figure: the white space under the first and under the second row, and the gap between columns.
 - `_title_styler`: Helper function to set a panel title in the figure style.
 - `decomposition_plotter`: Main function to draw a difference spectrum with its scatter-free fit, residual and each haem contribution.
 - `group_collector`: Main function to collect the decomposed experiments of each group, with their time labels.
 - `shared_baseline_subtracter`: Main function to subtract one shared polynomial baseline, fitted to the mean spectrum, from every spectrum.
 - `time_label_builder`: Main function to build the label of a time point from the experiment name.
-- `time_response_figure_plotter`: Main function to build the time response figure: waterfalls, then two examples (time course and decomposition).
+- `time_response_figure_plotter`: Main function to build the time response figure as a 3 x 3 grid. Plots 1 and 4 are the waterfalls of the two groups, plots 2-3 and 5-6 are two kinetic traces (each spanning two columns) and plots 7, 8 and 9 are three decomposition plots.
 - `time_response_figure_saver`: Main function to save the time response figure at its exact size.
 - `waterfall_plotter`: Main function to draw the offset difference spectra of one group, first time point at the top, with additive peak alignment.
 

@@ -233,12 +233,20 @@ def _time_response_asker(names: List[str],
                      )
         return None
     first_group = [n for n in timed if members[n] == groups[0]]
-    saved = [n for group, hours in (defaults.get('tr_examples') or [])
-             for n in timed
-             if members[n] == group and hours_parser(n) == hours
-             ][:2]
+
+    def _saved_names(key: str) -> list:
+        # Experiment names matching the (group, hours) pairs remembered under ``key``
+        return [n for group, hours in (defaults.get(key) or [])
+                for n in timed
+                if members[n] == group and hours_parser(n) == hours
+                ]
+
+    def _pair(name: str) -> list:
+        return [members[name], hours_parser(name)]
+
+    saved = _saved_names('tr_examples')[:2]
     top_default = saved[0] if saved else first_group[0]
-    left = choice_asker('Which experiment should the top example show?',
+    left = choice_asker('Which experiment should the first kinetic trace show?',
                         options,
                         top_default,
                         depth=2,
@@ -249,14 +257,53 @@ def _time_response_asker(names: List[str],
         bottom_default = first_group[-1]
     else:
         bottom_default = options[-1][0]
-    right = choice_asker('Which experiment should the bottom example show?',
+    right = choice_asker('Which experiment should the second kinetic trace show?',
                          options,
                          bottom_default,
                          depth=2,
                          )
-    answers['tr_examples'] = [[members[left], hours_parser(left)],
-                              [members[right], hours_parser(right)],
-                              ]
+    answers['tr_examples'] = [_pair(left), _pair(right)]
+
+    # The three decomposition plots are chosen separately from the kinetic traces.
+    saved = _saved_names('tr_decompositions')[:3]
+    unused = [n for n, _ in options if n not in (left, right)]
+    picks = []
+    for number in range(3):
+        if number < len(saved):
+            default = saved[number]
+        elif number == 0:
+            default = left
+        elif number == 1:
+            default = right
+        else:
+            default = (unused or [options[-1][0]])[0]
+        picks.append(choice_asker(f'Which experiment should decomposition plot '
+                                  f'{number + 1} show?',
+                                  options,
+                                  default,
+                                  depth=2,
+                                  ),
+                     )
+    answers['tr_decompositions'] = [_pair(name) for name in picks]
+
+    # Time points left out of the waterfall plots.
+    skipped = text_asker('Which time points (hours) should be skipped in the waterfall '
+                         'plots? Separate them with commas, or type none.',
+                         ', '.join(f'{h:g}'
+                                   for h in defaults.get('tr_skip_hours') or []
+                                   )
+                         or 'none',
+                         depth=2,
+                         )
+    answers['tr_skip_hours'] = []
+    for word in (skipped or '').replace(';', ',').split(','):
+        try:
+            answers['tr_skip_hours'].append(float(word))
+        except ValueError:
+            if word.strip() and word.strip().lower() != 'none':
+                info_printer(f'{word.strip()!r} is not a number, so it is ignored.',
+                             depth=2,
+                             )
 
     # ---- 3 Figure size ---------------------------------------------------------------
     size_asker(answers,
@@ -266,7 +313,7 @@ def _time_response_asker(names: List[str],
                 'height': 'tr_height',
                 'mode': 'tr_size_mode',
                 },
-               (2, 0.75),
+               (2, 1.0),
                depth=2,
                )
     return members

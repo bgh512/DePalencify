@@ -277,7 +277,7 @@ def _height_ratio_calculator(panels: List[dict], config: dict) -> List[float]:
         config.py.
 
     ---- Globals read ----
-    config keys PANEL_HEIGHT_RATIOS and EQUAL_PANEL_HEIGHTS.
+    config keys PANEL_HEIGHT_RATIOS, EQUAL_PANEL_HEIGHTS and HAEM_PANEL_WEIGHT.
 
     ---- Outputs ----
     List[float]
@@ -288,8 +288,8 @@ def _height_ratio_calculator(panels: List[dict], config: dict) -> List[float]:
     None.
 
     ---- Equations ----
-    ratio = weight for oxygen and vo2 panels; weight / n_haem for each haem panel; 1 for
-    every panel when EQUAL_PANEL_HEIGHTS is set.
+    ratio = weight for oxygen and vo2 panels; HAEM_PANEL_WEIGHT for each haem panel if
+    set, else weight / n_haem; 1 for every panel when EQUAL_PANEL_HEIGHTS is set.
 
     ---- Helpers ----
     None.
@@ -309,7 +309,11 @@ def _height_ratio_calculator(panels: List[dict], config: dict) -> List[float]:
             raise ValueError(f'PANEL_HEIGHT_RATIOS needs a positive value for '
                              f"{panel['type']!r}; got {weight!r}.",
                              )
-        ratios.append(weight / n_haem if panel['type'] == 'haem' else weight)
+        if panel['type'] == 'haem':
+            # HAEM_PANEL_WEIGHT gives every haem panel its own weight instead of
+            # sharing the haem weight between them.
+            weight = config.get('HAEM_PANEL_WEIGHT') or weight / n_haem
+        ratios.append(weight)
     return ratios
 
 
