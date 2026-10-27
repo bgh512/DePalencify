@@ -1277,7 +1277,8 @@ def _mean_ylim_setter(ax: Axes,
 
     ---- Equations ----
     low = min(means) - margin x range; high = max(means) + margin x range, where the
-    range is max(means) - min(means) (at least 1 % of the largest absolute mean).
+    range is max(means) - min(means) (at least 1 % of the largest absolute mean). When
+    all means are on one side of the baseline, the baseline side gets a 3 % margin.
 
     ---- Helpers ----
     _metric_field_selector
@@ -1294,8 +1295,19 @@ def _mean_ylim_setter(ax: Axes,
         return
 
     # ---- 2 Set the limits ------------------------------------------------------------
+    # When every mean lies on one side of the baseline, the baseline sits right at the
+    # edge of the axis (a small margin only) and the data fill the rest, so the axis
+    # does not waste half its height on the empty side.
     low, high = float(values.min()), float(values.max())
     span = max(high - low, 0.01 * max(abs(low), abs(high), 1e-12))
+    edge = 0.03
+    if baseline_level is not None and span > 0:
+        if high <= baseline_level + 0.02 * span:
+            ax.set_ylim(low - margin * span, baseline_level + edge * span)
+            return
+        if low >= baseline_level - 0.02 * span:
+            ax.set_ylim(baseline_level - edge * span, high + margin * span)
+            return
     ax.set_ylim(low - margin * span, high + margin * span)
 
 
@@ -1482,7 +1494,7 @@ def _ocr_block_plotter(fig: Figure,
                                     )
 
         # ---- 2.4 Add the significance tests ------------------------------------------
-        _mean_ylim_setter(ax, list(series.values()), 'change', 100)
+        ax.set_ylim(-3, 103)
         if tests is not None:
             _response_window_tester(ax,
                                     x,
@@ -1498,6 +1510,11 @@ def _ocr_block_plotter(fig: Figure,
     # ---- 3 Share the axis limits -----------------------------------------------------
     if config['SHARE_Y_BETWEEN_ORDERS'] and len(axes) > 1:
         _row_ylim_sharer(axes)
+
+    # The axis line itself covers only 0 to 100 % (the margins and the headroom for the
+    # significance bars sit outside it).
+    for ax in axes:
+        ax.spines['left'].set_bounds(0, 100)
 
     # ---- 4 Add the legend ------------------------------------------------------------
     axes[0].legend(handles=_legend_handle_builder(strains, config),
@@ -1994,16 +2011,78 @@ def _response_window_tester(ax: Axes,
     # axis that is from its current height, and extend the y range by it.
     axes_height_pt = ax.get_position().height * ax.figure.get_size_inches()[1] * 72.0
     # ---- 4 Draw the significance bars ------------------------------------------------
+    # Only as much as the bars need above the highest marked point: a panel whose
+    # data end well below the top of the axis already has the room.
     fraction = min(0.4, config['RESPONSE_TEST_HEADROOM_PT'] / axes_height_pt)
     low, high = ax.get_ylim()
-    high = max(high, max(result['top'] for result, _ in marks))
-    ax.set_ylim(low, low + (high - low) / (1.0 - fraction))
+    needed = max(result['top'] for result, _ in marks)
+    ax.set_ylim(low, max(high, low + (needed - low) / (1.0 - fraction)))
+    high = max(high, needed)
     # Only label ticks that lie within the data, not in the headroom above it.
     ax.set_yticks([tick for tick in ax.get_yticks() if low <= tick <= high])
     half = config['RESPONSE_GROUP_DODGE'] / 2.0
     for result, text in marks:
         centre = x[result['index']]
         _test_bar_drawer(ax, centre - half, centre + half, result['top'], text, config)
+
+
+# ---- _ROW LEGEND DRAWER --------------------------------------------------------------
+def _row_legend_drawer(fig: Figure, row_axes: dict, config: dict) -> None:
+    """
+    ---- Summary ----
+    Helper function to draw one legend per exemplar row, in the white space to the right
+    of the row and vertically centred on it, holding every coloured line of the row
+    (set and measured O2, then each haem) except the OCR trace.
+
+    ---- Inputs ----
+    fig : Figure
+        Matplotlib figure.
+    row_axes : dict
+        Axes list of the right-most quadrant of each row, keyed by row index.
+    config : dict
+        Individual-experiment settings (uses LEGEND_FONT_SIZE, LEGEND_FRAME and
+        LEGEND_FRAME_LINE_WIDTH).
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    None.
+
+    ---- Globals mutated ----
+    None. Adds one legend per row to ``fig``.
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    None.
+    """
+
+    for axes in row_axes.values():
+        handles, labels = [], []
+        for ax in axes:
+            if ax.get_ylabel() and ax.get_ylabel().startswith('OCR'):
+                continue
+            for handle, label in zip(*ax.get_legend_handles_labels()):
+                if label != config.get('VO2_LABEL') and not label.startswith('_'):
+                    handles.append(handle)
+                    labels.append(label)
+        if not handles:
+            continue
+        # Anchored to the row's top axes, at the vertical middle of the whole row.
+        top, bottom = axes[0].get_position(), axes[-1].get_position()
+        middle = ((top.y1 + bottom.y0) / 2 - top.y0) / top.height
+        legend = axes[0].legend(handles,
+                                labels,
+                                loc='center left',
+                                bbox_to_anchor=(1.02, middle),
+                                borderaxespad=0,
+                                frameon=config['LEGEND_FRAME'],
+                                fontsize=config['LEGEND_FONT_SIZE'],
+                                )
+        if config['LEGEND_FRAME']:
+            legend.get_frame().set_linewidth(config.get('LEGEND_FRAME_LINE_WIDTH', 0.4))
 
 
 # ---- _ROW YLIM SHARER ----------------------------------------------------------------
@@ -2424,6 +2503,7 @@ def exemplar_figure_plotter(experiments: dict,
     _exemplar_selector
     _experiment_cropper
     _figure_finisher
+    _row_legend_drawer
     experiment_title_builder
     watermark_style_builder
     """
@@ -2496,6 +2576,7 @@ def exemplar_figure_plotter(experiments: dict,
                             )
     letters, letter_names, axes_by_cell, panels = iter('ABCDEFGHIJKLMNOPQRSTUVWXYZ',
                                                        ), {}, {}, []
+    row_axes = {}
     for r, strain in enumerate(strains):
         for c, order in enumerate(orders):
             experiment = exemplars.get((strain, order))
@@ -2509,16 +2590,15 @@ def exemplar_figure_plotter(experiments: dict,
                                if r == 0
                                else {**individual_config, 'EVENT_LABELS': False}
                                )
-            if len(orders) > 1:
-                no_legends = {'oxygen': False, 'vo2': False, 'haem': False}
-                if c == 0:
-                    quadrant_config = {**quadrant_config, 'SHOW_LEGENDS': no_legends}
-                else:
-                    quadrant_config = {**quadrant_config, 'SHOW_Y_LABELS': False}
-                    if c == len(orders) - 1:
-                        quadrant_config['LEGENDS_OUTSIDE'] = True
-                    else:
-                        quadrant_config['SHOW_LEGENDS'] = no_legends
+            # One legend per row, drawn after the layout is final (section 6).
+            quadrant_config = {**quadrant_config,
+                               'SHOW_LEGENDS': {'oxygen': False,
+                                                'vo2': False,
+                                                'haem': False,
+                                                },
+                               }
+            if c > 0:
+                quadrant_config['SHOW_Y_LABELS'] = False
             axes = _exemplar_plotter(fig, grid[r, c], experiment, quadrant_config)
             axes_by_cell[(strain, order)] = axes
             letter = next(letters)
@@ -2536,6 +2616,8 @@ def exemplar_figure_plotter(experiments: dict,
                              **watermark_style_builder(individual_config),
                              )
             panels.append((letter, axes[0], list(axes)))
+            if c == len(orders) - 1:
+                row_axes[r] = list(axes)
 
     # ---- 5 Give each haem the same y axis in every quadrant -------------------------
     by_haem = {}
@@ -2556,6 +2638,7 @@ def exemplar_figure_plotter(experiments: dict,
                                 fontsize=config['SUPTITLE_FONT_SIZE'],
                                 fontweight='bold',
                                 )
+    _row_legend_drawer(fig, row_axes, individual_config)
     _figure_finisher(fig, config, panels, suptitle, fit_to_corner=True)
     print('  Exemplar panels: ' + ', '.join(f'{letter} = {name}'
                                             for letter, name in letter_names.items()

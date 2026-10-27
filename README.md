@@ -51,7 +51,7 @@ bars, OCR response, haem response) in the results folder, and
 
 ### Four experiments in a 2x2 grid (section 5)
 One run of each strain and addition order, drawn like the individual figures:
-`exemplar_figure.*` in the results folder.
+`2x2_comparison.*` in the results folder.
 
 Files whose names do not fit are listed and left out of that figure only.
 

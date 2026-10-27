@@ -231,6 +231,7 @@ Generated from the source. Names starting with `_` are private helpers.
 - `_response_metric_checker`: Helper function to reject a percent-of-baseline response for the delta abs sources, which start at 0.
 - `_response_series_drawer`: Helper function to plot every run as a point, the mean as a line and SEM error bars for one group.
 - `_response_window_tester`: Helper function to run a Student t-test between the two groups at every window of a response panel and mark the significant windows.
+- `_row_legend_drawer`: Helper function to draw one legend per exemplar row, in the white space to the right of the row and vertically centred on it, holding every coloured line of the row (set and measured O2, then each haem) except the OCR trace.
 - `_row_ylim_sharer`: Helper function to give every axes in a row the union of their y ranges.
 - `_significance_bar_drawer`: Helper function to draw a bracket between two x positions with text centred above it.
 - `_significance_formatter`: Helper function to format a p value as stars or as text.

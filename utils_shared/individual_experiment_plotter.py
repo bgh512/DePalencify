@@ -766,15 +766,7 @@ def experiment_drawer(fig: Figure,
                        else {'color': config['VO2_COLOUR']}
                        ),
                     )
-            ax.set_ylabel(vo2_label,
-                          labelpad=config['Y_LABEL_PAD']
-                          + (1.9 * config.get('LABEL_FONT_SIZE',
-                                              config['TICK_FONT_SIZE'] + 1,
-                                              )
-                             if '\n' in vo2_label
-                             else 0
-                             ),
-                          )
+            ax.set_ylabel(vo2_label, labelpad=config['Y_LABEL_PAD'])
             _min_ticks_setter(ax.yaxis, config['VO2_Y_NUM_TICKS'])
             y_max = config['VO2_Y_MAX']
             if y_max is None and np.isfinite(y).any():
@@ -929,17 +921,16 @@ def experiment_drawer(fig: Figure,
                                           config['TICK_FONT_SIZE'] + 1,
                                           ) + config['Y_LABEL_PAD']
                          )
-        span.set_ylabel(haem_label, labelpad=span_pad + 0.7 * config.get(
-            'LABEL_FONT_SIZE', config['TICK_FONT_SIZE'] + 1))
+        span.set_ylabel(haem_label,
+                        labelpad=span_pad + 0.5 * config['TICK_FONT_SIZE'],
+                        )
         label_axes.append(span)
 
     # ---- 8 Align the y labels --------------------------------------------------------
     # Line every y-label up at the same distance (Y_LABEL_PAD) from the left-most tick
     # labels.
     if config['ALIGN_Y_LABELS']:
-        aligned = [ax for ax, panel in zip(axes, panels)
-                   if panel['type'] not in ('oxygen', 'vo2')]
-        fig.align_ylabels(aligned + label_axes[len(axes):])
+        fig.align_ylabels(label_axes)
     return axes, panels
 
 

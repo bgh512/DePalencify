@@ -233,14 +233,25 @@ def _time_response_asker(names: List[str],
                      )
         return None
     first_group = [n for n in timed if members[n] == groups[0]]
+    saved = [n for group, hours in (defaults.get('tr_examples') or [])
+             for n in timed
+             if members[n] == group and hours_parser(n) == hours
+             ][:2]
+    top_default = saved[0] if saved else first_group[0]
     left = choice_asker('Which experiment should the top example show?',
                         options,
-                        first_group[0],
+                        top_default,
                         depth=2,
                         )
+    if len(saved) > 1:
+        bottom_default = saved[1]
+    elif first_group[-1] != left:
+        bottom_default = first_group[-1]
+    else:
+        bottom_default = options[-1][0]
     right = choice_asker('Which experiment should the bottom example show?',
                          options,
-                         first_group[-1] if first_group[-1] != left else options[-1][0],
+                         bottom_default,
                          depth=2,
                          )
     answers['tr_examples'] = [[members[left], hours_parser(left)],

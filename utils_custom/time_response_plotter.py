@@ -220,6 +220,7 @@ def _legend_drawer(ax: Axes,
                    location: str,
                    columns: Optional[int] = None,
                    outside: bool = False,
+                   anchor: Optional[tuple] = None,
                    ) -> Any:
     """
     ---- Summary ----
@@ -237,6 +238,9 @@ def _legend_drawer(ax: Axes,
         Number of legend columns, or None for the setting.
     outside : bool
         True puts the legend in the white space to the right of the axes.
+    anchor : Optional[tuple]
+        Axes-coordinate anchor of the legend's ``location`` point, which overrides
+        ``outside``.
 
     ---- Globals read ----
     None.
@@ -261,6 +265,8 @@ def _legend_drawer(ax: Axes,
                    'bbox_to_anchor': (1.03, 1.0),
                    'borderaxespad': 0,
                    }
+    if anchor is not None:
+        options = {'bbox_to_anchor': anchor, 'borderaxespad': 0}
     legend = ax.legend(**{'loc': location, **options},
                        frameon=config['LEGEND_FRAME'],
                        fontsize=config['LEGEND_FONT_SIZE'],
@@ -774,8 +780,7 @@ def time_response_figure_plotter(experiments: dict,
         waterfall_plotter(ax,
                           groups[group],
                           config,
-                          show_legend=config['WATERFALL_LEGEND_ON'] == 'all' or
-                          (config['WATERFALL_LEGEND_ON'] == 'first' and index == 0),
+                          show_legend=config['WATERFALL_LEGEND_ON'] == 'all',
                           )
         if config['WATERFALL_SHARE_X_AXIS'] and index == 0:
             ax.set_xlabel('')
@@ -817,13 +822,24 @@ def time_response_figure_plotter(experiments: dict,
                 )
     pad, gap = config['EDGE_PAD_PT'], config['TITLE_GAP_PT']
     figure_canvas_fitter(fig, pad, suptitle, gap)
+    if config['WATERFALL_LEGEND_ON'] == 'first':
+        # One legend in the white space right of the waterfalls, centred vertically
+        # on the gap between them (in the upper axes' coordinates).
+        upper, lower = axes['E'].get_position(), axes['F'].get_position()
+        centre = (upper.y0 + lower.y1) / 2
+        _legend_drawer(axes['E'],
+                       config,
+                       'center left',
+                       config['WATERFALL_LEGEND_COLUMNS'],
+                       anchor=(1.03, (centre - upper.y0) / upper.height),
+                       )
     if config['PANEL_LETTERS']:
         panel_letter_adder(fig,
                            panels,
                            config['PANEL_LETTER_FONT_SIZE'],
                            config['PANEL_LETTER_CASE'],
                            )
-        figure_canvas_fitter(fig, pad, suptitle, gap)
+    figure_canvas_fitter(fig, pad, suptitle, gap)
     return fig, axes
 
 
