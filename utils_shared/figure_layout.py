@@ -29,66 +29,6 @@ MM_PER_INCH = 25.4
 # ---- FIGURE LAYOUT HELPERS -----------------------------------------------------------
 
 
-# ---- _FREE TOP FINDER ----------------------------------------------------------------
-def _free_top_finder(members: List[Axes],
-                     left_px: float,
-                     right_px: float,
-                     renderer: Any,
-                     ) -> Optional[float]:
-    """
-    ---- Summary ----
-    Helper function to find the highest edge of anything a panel draws within a
-    horizontal range.
-
-    ---- Inputs ----
-    members : List[Axes]
-        Axes that make up the panel.
-    left_px : float
-        Left limit in display pixels.
-    right_px : float
-        Right limit in display pixels.
-    renderer : Any
-        Matplotlib renderer.
-
-    ---- Globals read ----
-    None.
-
-    ---- Outputs ----
-    Optional[float]
-        Highest top edge in display pixels, or None when nothing lies in the range.
-
-    ---- Globals mutated ----
-    None.
-
-    ---- Equations ----
-    None.
-
-    ---- Helpers ----
-    None.
-    """
-
-    # ---- 1 Measure the boxes ---------------------------------------------------------
-    boxes = []
-    for ax in members:
-        boxes += [ax.get_window_extent(renderer),
-                  ax.xaxis.get_tightbbox(renderer),
-                  ax.yaxis.get_tightbbox(renderer),
-                  ]
-        if ax.get_title():
-            boxes.append(ax.title.get_window_extent(renderer))
-        boxes += [text.get_window_extent(renderer)
-                  for text in ax.texts
-                  if text.get_text()
-                  ]
-
-    # ---- 2 Find the free top ---------------------------------------------------------
-    tops = [b.y1
-            for b in boxes
-            if b is not None and b.x1 >= left_px and b.x0 <= right_px
-            ]
-    return max(tops) if tops else None
-
-
 # ---- _RENDERER GETTER ----------------------------------------------------------------
 def _renderer_getter(fig: Figure) -> Any:
     """
@@ -448,12 +388,11 @@ def panel_letter_adder(fig: Figure,
                        case: str = 'upper',
                        weight: str = 'bold',
                        gap_pt: float = 0.0,
-                       fit_to_corner: bool = False,
                        ) -> list:
     """
     ---- Summary ----
-    Main function to write each panel letter at the top-left corner of everything its
-    panel draws.
+    Main function to write each panel letter just above the top edge of its panel's
+    main axes, to the left of everything the panel draws on that side.
 
     ---- Inputs ----
     fig : Figure
@@ -469,9 +408,6 @@ def panel_letter_adder(fig: Figure,
         Matplotlib font weight of the letters.
     gap_pt : float
         Extra gap above the panel in points.
-    fit_to_corner : bool
-        True puts each letter just above the first thing in its own corner instead of
-        above everything the panel draws.
 
     ---- Globals read ----
     None.
@@ -488,7 +424,6 @@ def panel_letter_adder(fig: Figure,
     None.
 
     ---- Helpers ----
-    _free_top_finder
     _renderer_getter
     """
 
@@ -507,15 +442,13 @@ def panel_letter_adder(fig: Figure,
                  ]
         main_box = main.get_window_extent(renderer)
         left = min(b.x0 for b in boxes)
-        top = max(b.y1 for b in boxes)
-        if fit_to_corner:
-            span = 1.2 * font_pt * fig.dpi / 72.0  # about the width of one letter
-            local = _free_top_finder(members, left, left + span, renderer)
-            top = max(local if local is not None else main_box.y1, main_box.y1)
+        # Never closer to the axes than one letter width, so a panel with nothing to
+        # its left still keeps its letter clear of the axes and the labels above them.
+        reach = max((main_box.x0 - left) * scale, 1.3 * font_pt)
         rows.append((letter,
                      main,
-                     (main_box.x0 - left) * scale,
-                     (top - main_box.y1) * scale,
+                     reach,
+                     0.0,
                      round(main_box.x0 / 2.0),
                      extra[0] if extra else None,
                      ),

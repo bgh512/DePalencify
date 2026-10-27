@@ -751,7 +751,11 @@ def experiment_drawer(fig: Figure,
                         linestyle=line_style,
                         **({} if colour is None else {'color': colour}),
                         )
-            ax.set_ylabel(config['O2_AXIS_LABEL'], labelpad=config['Y_LABEL_PAD'])
+            ax.set_ylabel(config['O2_AXIS_LABEL'],
+                          labelpad=config['Y_LABEL_PAD'],
+                          multialignment='center',
+                          linespacing=1.3,
+                          )
             _min_ticks_setter(ax.yaxis, config['O2_Y_NUM_TICKS'])
             if config['O2_Y_MIN'] is not None or config['O2_Y_MAX'] is not None:
                 ax.set_ylim(config['O2_Y_MIN'], config['O2_Y_MAX'])
@@ -766,7 +770,11 @@ def experiment_drawer(fig: Figure,
                        else {'color': config['VO2_COLOUR']}
                        ),
                     )
-            ax.set_ylabel(vo2_label, labelpad=config['Y_LABEL_PAD'])
+            ax.set_ylabel(vo2_label,
+                          labelpad=config['Y_LABEL_PAD'],
+                          multialignment='center',
+                          linespacing=1.3,
+                          )
             _min_ticks_setter(ax.yaxis, config['VO2_Y_NUM_TICKS'])
             y_max = config['VO2_Y_MAX']
             if y_max is None and np.isfinite(y).any():
@@ -923,6 +931,7 @@ def experiment_drawer(fig: Figure,
                          )
         span.set_ylabel(haem_label,
                         labelpad=span_pad + 0.5 * config['TICK_FONT_SIZE'],
+                        multialignment='center',
                         )
         label_axes.append(span)
 

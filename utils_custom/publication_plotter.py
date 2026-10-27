@@ -730,7 +730,6 @@ def _figure_finisher(fig: Figure,
                      config: dict,
                      panels: list,
                      suptitle: Any,
-                     fit_to_corner: bool = False,
                      ) -> None:
     """
     ---- Summary ----
@@ -746,9 +745,6 @@ def _figure_finisher(fig: Figure,
         List of (letter, main axes, [axes of the panel]) tuples.
     suptitle : Any
         Figure title text object, or None.
-    fit_to_corner : bool
-        False puts each letter above everything its panel draws; True puts it just above
-        whatever lies in its own corner.
 
     ---- Globals read ----
     None.
@@ -775,7 +771,6 @@ def _figure_finisher(fig: Figure,
                            panels,
                            config['PANEL_LETTER_FONT_SIZE'],
                            config['PANEL_LETTER_CASE'],
-                           fit_to_corner=fit_to_corner,
                            )
         figure_canvas_fitter(fig, pad, suptitle, gap)
 
@@ -2639,7 +2634,7 @@ def exemplar_figure_plotter(experiments: dict,
                                 fontweight='bold',
                                 )
     _row_legend_drawer(fig, row_axes, individual_config)
-    _figure_finisher(fig, config, panels, suptitle, fit_to_corner=True)
+    _figure_finisher(fig, config, panels, suptitle)
     print('  Exemplar panels: ' + ', '.join(f'{letter} = {name}'
                                             for letter, name in letter_names.items()
                                             ),

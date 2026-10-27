@@ -36,14 +36,13 @@ Generated from the source. Names starting with `_` are private helpers.
 
 ## utils_shared/figure_layout.py
 
-- `_free_top_finder`: Helper function to find the highest edge of anything a panel draws within a horizontal range.
 - `_renderer_getter`: Helper function to get the renderer of a figure canvas.
 - `figure_canvas_fitter`: Main function to set the figure margins so that everything drawn sits a fixed padding inside the figure edge, whatever the figure size, font size or label lengths.
 - `figure_size_calculator`: Main function to calculate the (width, height) of a figure in inches from a journal specification.
 - `figure_style_builder`: Main function to derive every font size, padding and line width of the figures from the journal specification and three master settings.
 - `figure_style_checker`: Main function to list warnings for fonts outside the journal range or a figure taller than the journal allows.
 - `gap_space_calculator`: Main function to calculate the GridSpec wspace or hspace that leaves a given gap between equal cells.
-- `panel_letter_adder`: Main function to write each panel letter at the top-left corner of everything its panel draws.
+- `panel_letter_adder`: Main function to write each panel letter just above the top edge of its panel's main axes, to the left of everything the panel draws on that side.
 - `text_extent_calculator`: Main function to calculate the width and height of the bounding box of a piece of text after rotating it.
 
 ## utils_shared/helpers.py

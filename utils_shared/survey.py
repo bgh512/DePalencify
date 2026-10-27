@@ -327,8 +327,38 @@ def analysis_asker(summaries: List[dict],
                                            )
     details = {s['name']: {} for s in summaries}
     if answers['normalise_od']:
-        for name, values in od_asker(summaries, saved).items():
-            details[name].update(values)
+        # List what is already stored for each run and only ask about the rest unless
+        # the user wants to change them.
+        stored_keys = ('OD', 'volume', 'dilution_factor')
+        complete = [s for s in summaries
+                    if all((saved.get(s['name']) or {}).get(k) for k in stored_keys[:2])
+                    ]
+        if complete:
+            info_printer('\nStored OD information:', depth=2, tight=True)
+            for summary in summaries:
+                old = saved.get(summary['name']) or {}
+                if summary in complete:
+                    text = (f"OD {old['OD']:g}, volume {old['volume']:g} mL, dilution "
+                            f"factor {old.get('dilution_factor', 1.0):g}"
+                            )
+                else:
+                    text = 'nothing stored'
+                info_printer(f"  {summary['name']}: {text}", depth=2, tight=True)
+        change = (not complete) or yes_no_asker('Do you want to change any of these?',
+                                                False,
+                                                )
+        to_ask = summaries if change else [s for s in summaries if s not in complete]
+        for summary in complete:
+            if summary not in to_ask:
+                old = saved[summary['name']]
+                details[summary['name']].update({'OD': old['OD'],
+                                                 'volume': old['volume'],
+                                                 'dilution_factor': old.get(
+                                                     'dilution_factor', 1.0),
+                                                 })
+        if to_ask:
+            for name, values in od_asker(to_ask, saved).items():
+                details[name].update(values)
 
     # ---- 3 Averaging -----------------------------------------------------------------
     averaging_asker(answers, defaults)
@@ -647,6 +677,15 @@ def files_asker(last: dict) -> Tuple[Path, List[dict], Path]:
     """
 
     # ---- 1 Ask for the .paf folder ---------------------------------------------------
+    # A hint only: folders ending _data in the program folder are listed, never chosen.
+    root = Path(__file__).resolve().parents[1]
+    data_folders = sorted(p.name for p in root.iterdir()
+                          if p.is_dir() and p.name.endswith('_data')
+                          )
+    if data_folders:
+        info_printer('_data folders found in ' + str(root) + ': '
+                     + ', '.join(data_folders),
+                     )
     while True:
         text = text_asker('What is the directory with the .paf files?',
                           last.get('data_folder'),

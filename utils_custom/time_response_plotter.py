@@ -720,6 +720,12 @@ def time_response_figure_plotter(experiments: dict,
                       'PLOT_AVERAGING_WINDOWS': True,
                       'AVERAGING_WINDOWS_KEY': 'averages',
                       }
+    # The short example panels cannot hold a one-line haem label, so it takes two lines
+    # (name, then units).
+    example_config['HAEM_AXIS_LABELS'] = {key: label.replace(' (', '\n(', 1)
+                                          for key, label
+                                          in example_config['HAEM_AXIS_LABELS'].items()
+                                          }
     label_height = _event_label_height_calculator([experiment
                                                    for _, _, experiment in example_picks
                                                    ],
