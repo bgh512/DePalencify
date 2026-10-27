@@ -20,6 +20,7 @@ from utils_custom.run_namer import condition_classifier, run_name_parser
 from utils_shared.figure_layout import (figure_canvas_fitter,
                                         gap_space_calculator,
                                         panel_letter_adder,
+                                        stack_legend_drawer,
                                         )
 from utils_shared.helpers import (concentration_formatter,
                                   figure_saver,
@@ -868,8 +869,6 @@ def _haem_block_plotter(fig: Figure,
         for c, order in enumerate(orders):
             ax = grid_axes[r][c]
             windows = _window_orderer(order, strains, triplicates, conditions)
-            if r == 0:
-                ax.set_title(f'Haem response: {ORDER_TITLES[order]}')
             if not windows:
                 ax.text(0.5,
                         0.5,
@@ -940,11 +939,6 @@ def _haem_block_plotter(fig: Figure,
             for ax in grid_axes[r]:
                 hider = _HideTopTickLabels(config['RESPONSE_TICK_FONT_SIZE'])
                 ax.yaxis.set_major_formatter(hider)
-    grid_axes[0][0].legend(handles=_legend_handle_builder(strains, config),
-                           loc=config['RESPONSE_LEGEND_LOCATION'],
-                           fontsize=config['RESPONSE_LEGEND_FONT_SIZE'],
-                           frameon=False,
-                           )
     return grid_axes, span
 
 
@@ -1441,8 +1435,6 @@ def _ocr_block_plotter(fig: Figure,
 
     # ---- 2 Plot each order -----------------------------------------------------------
     for col, (ax, order) in enumerate(zip(axes, orders)):
-        ax.set_title(f'OCR response: {ORDER_TITLES[order]}')
-
         # ---- 2.1 Order the windows ---------------------------------------------------
         windows = _window_orderer(order, strains, triplicates, conditions)
         if not windows:
@@ -1511,12 +1503,6 @@ def _ocr_block_plotter(fig: Figure,
     for ax in axes:
         ax.spines['left'].set_bounds(0, 100)
 
-    # ---- 4 Add the legend ------------------------------------------------------------
-    axes[0].legend(handles=_legend_handle_builder(strains, config),
-                   loc=config['RESPONSE_LEGEND_LOCATION'],
-                   fontsize=config['RESPONSE_LEGEND_FONT_SIZE'],
-                   frameon=False,
-                   )
     return axes
 
 
@@ -2021,65 +2007,6 @@ def _response_window_tester(ax: Axes,
         _test_bar_drawer(ax, centre - half, centre + half, result['top'], text, config)
 
 
-# ---- _ROW LEGEND DRAWER --------------------------------------------------------------
-def _row_legend_drawer(fig: Figure, row_axes: dict, config: dict) -> None:
-    """
-    ---- Summary ----
-    Helper function to draw one legend per exemplar row, in the white space to the right
-    of the row and vertically centred on it, holding every coloured line of the row
-    (set and measured O2, then each haem) except the OCR trace.
-
-    ---- Inputs ----
-    fig : Figure
-        Matplotlib figure.
-    row_axes : dict
-        Axes list of the right-most quadrant of each row, keyed by row index.
-    config : dict
-        Individual-experiment settings (uses LEGEND_FONT_SIZE, LEGEND_FRAME and
-        LEGEND_FRAME_LINE_WIDTH).
-
-    ---- Globals read ----
-    None.
-
-    ---- Outputs ----
-    None.
-
-    ---- Globals mutated ----
-    None. Adds one legend per row to ``fig``.
-
-    ---- Equations ----
-    None.
-
-    ---- Helpers ----
-    None.
-    """
-
-    for axes in row_axes.values():
-        handles, labels = [], []
-        for ax in axes:
-            if ax.get_ylabel() and ax.get_ylabel().startswith('OCR'):
-                continue
-            for handle, label in zip(*ax.get_legend_handles_labels()):
-                if label != config.get('VO2_LABEL') and not label.startswith('_'):
-                    handles.append(handle)
-                    labels.append(label)
-        if not handles:
-            continue
-        # Anchored to the row's top axes, at the vertical middle of the whole row.
-        top, bottom = axes[0].get_position(), axes[-1].get_position()
-        middle = ((top.y1 + bottom.y0) / 2 - top.y0) / top.height
-        legend = axes[0].legend(handles,
-                                labels,
-                                loc='center left',
-                                bbox_to_anchor=(1.02, middle),
-                                borderaxespad=0,
-                                frameon=config['LEGEND_FRAME'],
-                                fontsize=config['LEGEND_FONT_SIZE'],
-                                )
-        if config['LEGEND_FRAME']:
-            legend.get_frame().set_linewidth(config.get('LEGEND_FRAME_LINE_WIDTH', 0.4))
-
-
 # ---- _ROW YLIM SHARER ----------------------------------------------------------------
 def _row_ylim_sharer(axes_row: list) -> None:
     """
@@ -2498,8 +2425,8 @@ def exemplar_figure_plotter(experiments: dict,
     _exemplar_selector
     _experiment_cropper
     _figure_finisher
-    _row_legend_drawer
     experiment_title_builder
+    stack_legend_drawer
     watermark_style_builder
     """
 
@@ -2633,7 +2560,8 @@ def exemplar_figure_plotter(experiments: dict,
                                 fontsize=config['SUPTITLE_FONT_SIZE'],
                                 fontweight='bold',
                                 )
-    _row_legend_drawer(fig, row_axes, individual_config)
+    for stack in row_axes.values():
+        stack_legend_drawer(stack, individual_config)
     _figure_finisher(fig, config, panels, suptitle)
     print('  Exemplar panels: ' + ', '.join(f'{letter} = {name}'
                                             for letter, name in letter_names.items()
@@ -2813,7 +2741,24 @@ def publication_figure_plotter(experiments: dict,
                                 f'haem response {ORDER_TITLES[order]}',
                                 )
 
-    # ---- 4 Fit margins and add panel letters -----------------------------------------
+    # ---- 4 Add one title per column and one legend -----------------------------------
+    # The addition order heads each column, once, above its top response panel; the
+    # group legend shares that row at the right.
+    heads = axes_ocr or (list(axes_haem[0]) if axes_haem else [])
+    for order, ax in zip(orders, heads):
+        ax.set_title(ORDER_TITLES[order])
+    if heads:
+        heads[-1].legend(handles=_legend_handle_builder(strains, config),
+                         loc='lower right',
+                         bbox_to_anchor=(1.0, 1.0),
+                         ncol=len(strains),
+                         fontsize=config['RESPONSE_LEGEND_FONT_SIZE'],
+                         frameon=False,
+                         borderaxespad=0.2,
+                         columnspacing=1.0,
+                         )
+
+    # ---- 5 Fit margins and add panel letters -----------------------------------------
     suptitle = None
     if config['FIGURE_TITLE']:
         suptitle = fig.suptitle(config['FIGURE_TITLE'],
@@ -2822,7 +2767,7 @@ def publication_figure_plotter(experiments: dict,
                                 )
     _figure_finisher(fig, config, panels, suptitle)
 
-    # ---- 5 Report --------------------------------------------------------------------
+    # ---- 6 Report --------------------------------------------------------------------
     fig.response_tests = tests
     if config['RESPONSE_TESTS']:
         significant = sum(row['significant'] for row in tests)

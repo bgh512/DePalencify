@@ -493,6 +493,68 @@ def panel_letter_adder(fig: Figure,
     return artists
 
 
+# ---- STACK LEGEND DRAWER -------------------------------------------------------------
+def stack_legend_drawer(axes: List[Axes], config: dict) -> Optional[Any]:
+    """
+    ---- Summary ----
+    Main function to draw one legend for a vertical stack of axes (an individual
+    experiment plot), in the white space to the right of the stack and centred on its
+    height. It holds every labelled line of the stack (set and measured O2, then each
+    haem) except the OCR trace.
+
+    ---- Inputs ----
+    axes : List[Axes]
+        Axes of the stack, top first.
+    config : dict
+        Settings; uses LEGEND_FONT_SIZE, LEGEND_FRAME, LEGEND_FRAME_LINE_WIDTH
+        (optional) and VO2_LABEL (optional).
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    Optional[Any]
+        The legend, or None when the stack has no labelled lines.
+
+    ---- Globals mutated ----
+    None. Adds a legend to the top axes (side effect).
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    None.
+    """
+
+    # ---- 1 Collect the lines ---------------------------------------------------------
+    handles, labels = [], []
+    for ax in axes:
+        if ax.get_ylabel().startswith('OCR'):
+            continue
+        for handle, label in zip(*ax.get_legend_handles_labels()):
+            if label != config.get('VO2_LABEL') and not label.startswith('_'):
+                handles.append(handle)
+                labels.append(label)
+    if not handles:
+        return None
+
+    # ---- 2 Draw the legend -----------------------------------------------------------
+    # Anchored to the top axes, at the vertical middle of the whole stack.
+    top, bottom = axes[0].get_position(), axes[-1].get_position()
+    middle = ((top.y1 + bottom.y0) / 2 - top.y0) / top.height
+    legend = axes[0].legend(handles,
+                            labels,
+                            loc='center left',
+                            bbox_to_anchor=(1.02, middle),
+                            borderaxespad=0,
+                            frameon=config['LEGEND_FRAME'],
+                            fontsize=config['LEGEND_FONT_SIZE'],
+                            )
+    if config['LEGEND_FRAME']:
+        legend.get_frame().set_linewidth(config.get('LEGEND_FRAME_LINE_WIDTH', 0.4))
+    return legend
+
+
 # ---- TEXT EXTENT CALCULATOR ----------------------------------------------------------
 def text_extent_calculator(text: str,
                            size_pt: float,

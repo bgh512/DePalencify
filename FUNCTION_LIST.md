@@ -43,6 +43,7 @@ Generated from the source. Names starting with `_` are private helpers.
 - `figure_style_checker`: Main function to list warnings for fonts outside the journal range or a figure taller than the journal allows.
 - `gap_space_calculator`: Main function to calculate the GridSpec wspace or hspace that leaves a given gap between equal cells.
 - `panel_letter_adder`: Main function to write each panel letter just above the top edge of its panel's main axes, to the left of everything the panel draws on that side.
+- `stack_legend_drawer`: Main function to draw one legend for a vertical stack of axes (an individual experiment plot), in the white space to the right of the stack and centred on its height. It holds every labelled line of the stack (set and measured O2, then each haem) except the OCR trace.
 - `text_extent_calculator`: Main function to calculate the width and height of the bounding box of a piece of text after rotating it.
 
 ## utils_shared/helpers.py
@@ -230,7 +231,6 @@ Generated from the source. Names starting with `_` are private helpers.
 - `_response_metric_checker`: Helper function to reject a percent-of-baseline response for the delta abs sources, which start at 0.
 - `_response_series_drawer`: Helper function to plot every run as a point, the mean as a line and SEM error bars for one group.
 - `_response_window_tester`: Helper function to run a Student t-test between the two groups at every window of a response panel and mark the significant windows.
-- `_row_legend_drawer`: Helper function to draw one legend per exemplar row, in the white space to the right of the row and vertically centred on it, holding every coloured line of the row (set and measured O2, then each haem) except the OCR trace.
 - `_row_ylim_sharer`: Helper function to give every axes in a row the union of their y ranges.
 - `_significance_bar_drawer`: Helper function to draw a bracket between two x positions with text centred above it.
 - `_significance_formatter`: Helper function to format a p value as stars or as text.

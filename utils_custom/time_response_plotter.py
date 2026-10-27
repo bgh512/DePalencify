@@ -16,6 +16,7 @@ from utils_custom.run_namer import hours_parser
 from utils_shared.figure_layout import (figure_canvas_fitter,
                                         gap_space_calculator,
                                         panel_letter_adder,
+                                        stack_legend_drawer,
                                         text_extent_calculator,
                                         )
 from utils_shared.helpers import (concentration_formatter,
@@ -346,8 +347,8 @@ def _time_gap_calculator(config: dict,
 
     ---- Equations ----
     row_gap = 1.2 tick + 0.5 unit + label pad + 1.2 label + event label height + 1.0
-    unit; column_gap = 1.2 label + 0.5 unit + 5 x 0.55 tick + 0.5 unit + 1.5 unit
-    (points).
+    unit; column_gap = 1.2 label + 0.5 unit + 5 x 0.55 tick + 0.5 unit + 1.5 unit +
+    (0.55 x 13 + 4) legend fonts for the example legend (points).
 
     ---- Helpers ----
     gap_space_calculator
@@ -366,7 +367,11 @@ def _time_gap_calculator(config: dict,
                label_height_pt +
                1.0 * unit
                )
-    column_gap = 1.2 * label + 0.5 * unit + 5 * 0.55 * tick + 0.5 * unit + 1.5 * unit
+    # the legend of each example sits in the gap, right of the stack
+    legend_width = (0.55 * 13 + 4.0) * config['LEGEND_FONT_SIZE']
+    column_gap = (1.2 * label + 0.5 * unit + 5 * 0.55 * tick + 0.5 * unit + 1.5 * unit
+                  + legend_width
+                  )
     return (gap_space_calculator(row_gap, height_pt - 6 * unit, 3),
             gap_space_calculator(column_gap, width_pt - 8 * unit, 2),
             row_gap,
@@ -698,6 +703,7 @@ def time_response_figure_plotter(experiments: dict,
     gap_space_calculator
     group_collector
     panel_letter_adder
+    stack_legend_drawer
     waterfall_plotter
     """
 
@@ -720,6 +726,7 @@ def time_response_figure_plotter(experiments: dict,
                       'PLOT_AVERAGING_WINDOWS': True,
                       'AVERAGING_WINDOWS_KEY': 'averages',
                       }
+    example_config['SHOW_LEGENDS'] = {'oxygen': False, 'vo2': False, 'haem': False}
     # The short example panels cannot hold a one-line haem label, so it takes two lines
     # (name, then units).
     example_config['HAEM_AXIS_LABELS'] = {key: label.replace(' (', '\n(', 1)
@@ -803,6 +810,7 @@ def time_response_figure_plotter(experiments: dict,
                                      )
         # the panels and the invisible axes that carries the shared label
         members = [ax for ax in fig.axes if id(ax) not in known]
+        stack_legend_drawer(stack, example_config)
         decomposition_ax = fig.add_subplot(grid[row, 1])
         group_title = config['GROUP_TITLES'].get(group, group)
         title = config['EXAMPLE_TITLE_FORMAT'].format(group=group_title, time=label)
