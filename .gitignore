@@ -11,7 +11,6 @@ logs/
 
 # ---- project ----
 last_answers.json
-.shortcut_made
 
 # >>> style guide (managed block, do not edit between these lines) >>>
 # Python environments and caches
