@@ -1,0 +1,19 @@
+BasedOnStyle: LLVM
+Language: Cpp
+IndentWidth: 4
+TabWidth: 4
+UseTab: Never
+ColumnLimit: 88
+BreakBeforeBraces: Allman
+PointerAlignment: Left
+MaxEmptyLinesToKeep: 2            # keeps up to 2; cannot force exactly 2
+
+# One argument per line when a call does not fit, aligned after the bracket
+AlignAfterOpenBracket: Align
+BinPackArguments: false
+BinPackParameters: false
+AllowAllArgumentsOnNextLine: false
+AllowAllParametersOfDeclarationOnNextLine: false
+
+# NOTE: clang-format cannot force trailing commas in C++ or put the closing
+# bracket on its own line in the "Align" style.

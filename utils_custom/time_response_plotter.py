@@ -1,0 +1,1152 @@
+"""
+Time response figure: waterfalls, example time courses and decompositions.
+"""
+
+# ---- STANDARD IMPORTS ----------------------------------------------------------------
+import math
+from typing import Any, Optional
+
+# ---- 3RD PARTY IMPORTS ---------------------------------------------------------------
+import matplotlib.pyplot as plt
+import numpy as np
+from matplotlib.axes import Axes
+from matplotlib.gridspec import GridSpec
+from matplotlib.ticker import AutoLocator
+from matplotlib.transforms import ScaledTranslation
+
+# ---- LOCAL IMPORTS -------------------------------------------------------------------
+from utils_custom.run_namer import hours_parser
+from utils_shared.figure_layout import (figure_canvas_fitter,
+                                        gap_space_calculator,
+                                        panel_letter_adder,
+                                        stack_legend_drawer,
+                                        text_extent_calculator,
+                                        )
+from utils_shared.helpers import concentration_formatter, name_simplifier
+from utils_shared.individual_experiment_plotter import experiment_drawer
+
+
+# ---- TIME RESPONSE PLOTTER HELPERS ---------------------------------------------------
+
+
+# ---- _event_label_height_calculator --------------------------------------------------
+def _event_label_height_calculator(experiments: list, individual_config: dict) -> float:
+    """
+    ---- Summary ----
+    Helper function to calculate the height the rotated event labels above the example
+    time courses need.
+
+    ---- Inputs ----
+    experiments : list
+        Example experiments.
+    individual_config : dict
+        Individual-experiment plot settings, as returned by Config.plot_config in
+        config.py.
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    float
+        Height in points; 0 when the labels are not drawn on top.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    concentration_formatter
+    text_extent_calculator
+    """
+
+    # ---- 1 Check whether events are plotted ------------------------------------------
+    c = individual_config
+    if not (c['PLOT_EVENTS'] and
+            c['EVENT_LABELS'] and
+            c.get('EVENT_LABELS_ON_TOP', True)
+            ):
+        return 0.0
+
+    # ---- 2 Measure the labels --------------------------------------------------------
+    heights = []
+    for experiment in experiments:
+        for event in experiment.get('metadata', {}).get('events', []):
+            conc = event.get('concentration_uM')
+            text = (f"{'? µM' if conc is None else concentration_formatter(conc)} "
+                    f"{event.get('label', '')}".strip()
+                    )
+            heights.append(text_extent_calculator(text,
+                                                  c['EVENT_LABEL_FONTSIZE'],
+                                                  c['EVENT_LABEL_ROTATION'],
+                                                  )[1],
+                           )
+    return (max(heights) if heights else 0.0) + c['EVENT_LABEL_OFFSET']
+
+
+# ---- _example_finder -----------------------------------------------------------------
+def _example_finder(groups: dict, group: str, hours: float) -> tuple:
+    """
+    ---- Summary ----
+    Helper function to find the experiment of one group at a given number of hours.
+
+    ---- Inputs ----
+    groups : dict
+        {group: [(time label, experiment), ...]}.
+    group : str
+        Group name.
+    hours : float
+        Hours in the experiment name.
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    tuple
+        (time label, experiment). Raises ValueError if there is none.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    hours_parser
+    """
+
+    if group not in groups:
+        raise ValueError(f'Example group {group!r} must be one of {list(groups)}.')
+    for label, experiment in groups[group]:
+        if hours_parser(experiment['experiment_name']) == float(hours):
+            return label, experiment
+    raise ValueError(f'No {group} experiment at {hours} hours; available: '
+                     f'{[label for label, _ in groups[group]]}.',
+                     )
+
+
+# ---- _example_viewer -----------------------------------------------------------------
+def _example_viewer(experiment: dict) -> dict:
+    """
+    ---- Summary ----
+    Helper function to copy an experiment so that its individual figure shows only the
+    two windows its difference spectrum came from.
+
+    ---- Inputs ----
+    experiment : dict
+        Experiment dictionary, as defined in DATA_FORMAT.md.
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    dict
+        Copy with averages holding the penultimate and final spectral windows.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    None.
+    """
+
+    averages = experiment['spectral_averages']
+    chosen = [averages['roles']['penultimate'], averages['roles']['final']]
+    return {**experiment,
+            'averages': {'windows': {name: averages['windows'][name] for name in chosen
+                                     },
+                         },
+            }
+
+
+# ---- _haem_scale_sharer --------------------------------------------------------------
+def _haem_scale_sharer(stacks: list, config: dict) -> None:
+    """
+    ---- Summary ----
+    Helper function to give each haem the same y range in every stack, so that all the
+    a haems share one scale, all the cc haems another, and so on.
+
+    ---- Inputs ----
+    stacks : list
+        Axes lists of the kinetic traces (each from experiment_drawer).
+    config : dict
+        Figure settings; uses HAEM_Y_MAX_TICKS to thin the tick labels again.
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    None
+        Nothing.
+
+    ---- Globals mutated ----
+    None. Sets the y limits and ticks of the haem axes (side effect).
+
+    ---- Equations ----
+    Limits are the union of the stacks' limits for the same haem.
+
+    ---- Helpers ----
+    None.
+    """
+
+    # ---- 1 Group the haem axes by haem -----------------------------------------------
+    by_haem = {}
+    for stack in stacks:
+        for ax in stack:
+            names = getattr(ax, 'haem_names', None)
+            if names:
+                by_haem.setdefault(tuple(names), []).append(ax)
+
+    # ---- 2 Share the limits and thin the ticks ---------------------------------------
+    max_ticks = config.get('HAEM_Y_MAX_TICKS')
+    for group in by_haem.values():
+        lows, highs = zip(*(sorted(ax.get_ylim()) for ax in group))
+        for ax in group:
+            ax.set_ylim(min(lows), max(highs))
+            ax.yaxis.set_major_locator(AutoLocator())
+            low, high = ax.get_ylim()
+            ticks = [tick for tick in ax.get_yticks() if low <= tick <= high]
+            if max_ticks and len(ticks) > max_ticks:
+                ticks = [ticks[0], ticks[-1]]
+            ax.set_yticks(ticks)
+
+
+# ---- _haem_window_drawer -------------------------------------------------------------
+def _haem_window_drawer(ax: Axes, decomposition: dict, config: dict) -> None:
+    """
+    ---- Summary ----
+    Helper function to shade, behind the spectra, a window around the peak of every
+    haem in the haem's own colour, to show where each haem should appear.
+
+    ---- Inputs ----
+    ax : Axes
+        Matplotlib axes with wavelength on the x axis.
+    decomposition : dict
+        difference_decomposition of an experiment (DATA_FORMAT.md).
+    config : dict
+        Figure settings dictionary built in custom_config.py.
+
+    ---- Globals read ----
+    config keys HAEM_COLOURS, HAEM_WINDOW_HALF_WIDTH_NM and HAEM_WINDOW_ALPHA.
+
+    ---- Outputs ----
+    None
+
+    ---- Globals mutated ----
+    None. Draws on ``ax`` and leaves its x limits as they were (side effect).
+
+    ---- Equations ----
+    window = peak +- HAEM_WINDOW_HALF_WIDTH_NM, where the peak is the wavelength of the
+    largest absolute value of the haem's fitted component.
+
+    ---- Helpers ----
+    name_simplifier
+    """
+
+    # ---- 1 Draw one window per haem --------------------------------------------------
+    colours = {name_simplifier(k): v for k, v in config['HAEM_COLOURS'].items()}
+    half = config['HAEM_WINDOW_HALF_WIDTH_NM']
+    x_limits = ax.get_xlim()
+    for name, component in zip(decomposition['haem_names'],
+                               decomposition['haem_individual'],
+                               ):
+        values = np.abs(component[:, 1])
+        if not np.isfinite(values).any() or np.nanmax(values) == 0:
+            continue
+        centre = float(component[int(np.nanargmax(values)), 0])
+        ax.axvspan(centre - half,
+                   centre + half,
+                   color=colours.get(name_simplifier(name)),
+                   alpha=config['HAEM_WINDOW_ALPHA'],
+                   linewidth=0,
+                   zorder=0,
+                   )
+    ax.set_xlim(x_limits)
+
+
+# ---- _legend_drawer ------------------------------------------------------------------
+def _legend_drawer(ax: Axes,
+                   config: dict,
+                   location: str,
+                   columns: Optional[int] = None,
+                   outside: bool = False,
+                   anchor: Optional[tuple] = None,
+                   ) -> Any:
+    """
+    ---- Summary ----
+    Helper function to draw a legend in the journal style: small text and an optional
+    thin box.
+
+    ---- Inputs ----
+    ax : Axes
+        Matplotlib axes to draw on.
+    config : dict
+        Figure settings dictionary built in custom_config.py.
+    location : str
+        Matplotlib legend location.
+    columns : Optional[int]
+        Number of legend columns, or None for the setting.
+    outside : bool
+        True puts the legend in the white space to the right of the axes.
+    anchor : Optional[tuple]
+        Axes-coordinate anchor of the legend's ``location`` point, which overrides
+        ``outside``.
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    Any
+        The legend.
+
+    ---- Globals mutated ----
+    None. Adds a legend to ``ax`` (side effect).
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    None.
+    """
+
+    options = {}
+    if outside:
+        options = {'loc': 'upper left',
+                   'bbox_to_anchor': (1.03, 1.0),
+                   'borderaxespad': 0,
+                   }
+    if anchor is not None:
+        options = {'bbox_to_anchor': anchor, 'borderaxespad': 0}
+    legend = ax.legend(**{'loc': location, **options},
+                       frameon=config['LEGEND_FRAME'],
+                       fontsize=config['LEGEND_FONT_SIZE'],
+                       ncol=columns or config['LEGEND_COLUMNS'],
+                       )
+    if config['LEGEND_FRAME']:
+        legend.get_frame().set_linewidth(config['THIN_LINE_WIDTH'])
+    return legend
+
+
+# ---- _time_axes_styler ---------------------------------------------------------------
+def _time_axes_styler(ax: Axes, config: dict) -> None:
+    """
+    ---- Summary ----
+    Helper function to apply the tick direction, label size and spine style.
+
+    ---- Inputs ----
+    ax : Axes
+        Matplotlib axes to draw on.
+    config : dict
+        Figure settings dictionary built in custom_config.py.
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    None
+        Nothing.
+
+    ---- Globals mutated ----
+    None. Changes the style of ``ax`` (side effect).
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    None.
+    """
+
+    ax.tick_params(axis='both',
+                   which='both',
+                   labelsize=config['TICK_FONT_SIZE'],
+                   direction=config['TICK_DIRECTION'],
+                   )
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+
+
+# ---- _time_gap_calculator ------------------------------------------------------------
+def _time_gap_calculator(config: dict,
+                         individual_config: dict,
+                         label_height_pt: float,
+                         legend_rows: int,
+                         ) -> tuple:
+    """
+    ---- Summary ----
+    Helper function to calculate the gaps of the time response figure: the white space
+    under the first and under the second row, and the gap between columns.
+
+    ---- Inputs ----
+    config : dict
+        Figure settings dictionary built in custom_config.py.
+    individual_config : dict
+        Individual-experiment plot settings, as returned by Config.plot_config in
+        config.py.
+    label_height_pt : float
+        Height of the event labels in points.
+    legend_rows : int
+        Number of text rows of the legends that hang under the second row.
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    tuple
+        (gap under row 1, gap under row 2, column gap), all in points.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    x_block = 1.2 tick + 0.5 unit + label pad + 1.2 label; gap 1 = x_block + max(event
+    label height, 1.2 title + 0.8 unit) + 1.0 unit; gap 2 = x_block + legend rows x 1.35
+    legend font + 1.2 unit + 1.2 title + 0.8 unit + 1.0 unit; column_gap = 1.2 label +
+    0.5 unit + 5 x 0.55 tick + 0.5 unit + 1.5 unit.
+
+    ---- Helpers ----
+    None.
+    """
+
+    # ---- 1 Read the configuration ----------------------------------------------------
+    unit = config['UNIT_PT']
+    tick, label = config['TICK_FONT_SIZE'], config['AXIS_LABEL_FONT_SIZE']
+    title = 1.2 * config['TITLE_FONT_SIZE'] + 0.8 * unit
+
+    # ---- 2 Calculate the gaps --------------------------------------------------------
+    x_block = (1.2 * tick +
+               0.5 * unit +
+               individual_config['TIME_AXIS_LABEL_PAD'] +
+               1.2 * label
+               )
+    gap_1 = x_block + max(label_height_pt, title) + 1.0 * unit
+    legend_block = legend_rows * 1.35 * config['LEGEND_FONT_SIZE'] + 1.2 * unit
+    gap_2 = x_block + legend_block + title + 1.0 * unit
+    column_gap = 1.2 * label + 0.5 * unit + 5 * 0.55 * tick + 0.5 * unit + 1.5 * unit
+    return gap_1, gap_2, column_gap
+
+
+# ---- _title_styler -------------------------------------------------------------------
+def _title_styler(ax: Axes, text: str, config: dict) -> None:
+    """
+    ---- Summary ----
+    Helper function to set a panel title in the figure style.
+
+    ---- Inputs ----
+    ax : Axes
+        Matplotlib axes to draw on.
+    text : str
+        Title text.
+    config : dict
+        Figure settings dictionary built in custom_config.py.
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    None
+        Nothing.
+
+    ---- Globals mutated ----
+    None. Sets the title of ``ax`` (side effect).
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    None.
+    """
+
+    ax.set_title(text,
+                 fontsize=config['TITLE_FONT_SIZE'],
+                 loc=config['TITLE_ALIGNMENT'],
+                 fontweight=config['TITLE_WEIGHT'],
+                 )
+
+
+# ---- MAIN FUNCTIONS ------------------------------------------------------------------
+
+
+# ---- decomposition_plotter -----------------------------------------------------------
+def decomposition_plotter(ax: Axes,
+                          decomposition: dict,
+                          config: dict,
+                          show_legend: bool = True,
+                          ) -> None:
+    """
+    ---- Summary ----
+    Main function to draw a difference spectrum with its scatter-free fit, residual and
+    each haem contribution.
+
+    ---- Inputs ----
+    ax : Axes
+        Matplotlib axes to draw on.
+    decomposition : dict
+        difference_decomposition of an experiment (DATA_FORMAT.md).
+    config : dict
+        Figure settings dictionary built in custom_config.py.
+    show_legend : bool
+        True draws the legend inside the axes; False leaves it to the caller.
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    None
+        Nothing.
+
+    ---- Globals mutated ----
+    None. Draws on ``ax`` (side effect).
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    _haem_window_drawer
+    _legend_drawer
+    _time_axes_styler
+    name_simplifier
+    """
+
+    # ---- 1 Read the decomposition ----------------------------------------------------
+    measured = decomposition['no_scatter']
+    residual = decomposition['residual']
+    colours = {name_simplifier(k): v for k, v in config['HAEM_COLOURS'].items()}
+    width = config['LINE_WIDTH']
+
+    # ---- 2 Draw the spectra ----------------------------------------------------------
+    ax.plot(measured[:, 0],
+            measured[:, 1],
+            color='black',
+            label='Spectrum',
+            linewidth=width,
+            )
+    ax.plot(residual[:, 0],
+            residual[:, 1],
+            color='grey',
+            label='Residual',
+            linewidth=width,
+            )
+
+    # ---- 3 Draw the haem components --------------------------------------------------
+    for name, component in zip(decomposition['haem_names'],
+                               decomposition['haem_individual'],
+                               ):
+        ax.plot(component[:, 0],
+                component[:, 1],
+                color=colours.get(name_simplifier(name)),
+                label=name,
+                linewidth=width,
+                )
+
+    # ---- 4 Style the axes ------------------------------------------------------------
+    ax.set_xlim(left=np.min(measured[:, 0]), right=np.max(measured[:, 0]))
+    _haem_window_drawer(ax, decomposition, config)
+    ax.set_xlabel('Wavelength (nm)', fontsize=config['AXIS_LABEL_FONT_SIZE'])
+    ax.set_ylabel(config['DECOMPOSITION_Y_LABEL'],
+                  fontsize=config['AXIS_LABEL_FONT_SIZE'],
+                  )
+    _time_axes_styler(ax, config)
+    if show_legend:
+        _legend_drawer(ax, config, config['DECOMPOSITION_LEGEND_LOCATION'])
+    ax.set_xlim(left=np.min(measured[:, 0]), right=np.max(measured[:, 0]))
+
+
+# ---- group_collector -----------------------------------------------------------------
+def group_collector(experiments: dict, config: dict) -> dict:
+    """
+    ---- Summary ----
+    Main function to collect the decomposed experiments of each group, with their time
+    labels.
+
+    ---- Inputs ----
+    experiments : dict
+        Experiment dictionaries keyed by experiment name, as defined in DATA_FORMAT.md.
+    config : dict
+        Figure settings dictionary built in custom_config.py.
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    dict
+        {group: [(time label, experiment), ...]}. Experiments without a difference
+        decomposition are reported and left out; ValueError if a group is empty.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    time_label_builder
+    """
+
+    # ---- 1 Prepare the groups --------------------------------------------------------
+    groups = {group: [] for group in config['GROUP_ORDER']}
+
+    # ---- 2 Collect the experiments ---------------------------------------------------
+    for name, experiment in experiments.items():
+        group = experiment.get('group')
+        if group not in groups:
+            continue
+        if 'difference_decomposition' not in experiment:
+            print(f'  Skipping {name} in the time response figure: no difference '
+                  f'decomposition.',
+                  )
+            continue
+        groups[group].append((time_label_builder(name, config['TIME_LABEL_FORMAT']),
+                              experiment,
+                              ),
+                             )
+
+    # ---- 3 Check for empty groups ----------------------------------------------------
+    empty = [group for group, items in groups.items() if not items]
+    if empty:
+        raise ValueError(f"No decomposed experiments for group(s): {', '.join(empty)}.")
+    return groups
+
+
+# ---- shared_baseline_subtracter ------------------------------------------------------
+def shared_baseline_subtracter(wavelengths: np.ndarray,
+                               spectra: np.ndarray,
+                               x_min: Optional[float] = None,
+                               x_max: Optional[float] = None,
+                               degree: int = 1,
+                               ) -> tuple:
+    """
+    ---- Summary ----
+    Main function to subtract one shared polynomial baseline, fitted to the mean
+    spectrum, from every spectrum.
+
+    ---- Inputs ----
+    wavelengths : np.ndarray
+        Wavelengths, shape (n_wavelengths, n_spectra), nm.
+    spectra : np.ndarray
+        Spectra, shape (n_wavelengths, n_spectra).
+    x_min : Optional[float]
+        Lower wavelength of the fit range, or None.
+    x_max : Optional[float]
+        Upper wavelength of the fit range, or None.
+    degree : int
+        Polynomial degree, at least 1.
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    tuple
+        (corrected spectra, shared baseline), both shaped like ``spectra``.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    baseline(w) = polynomial fitted to mean over spectra of S(w) within [x_min, x_max];
+    corrected = S - baseline.
+
+    ---- Helpers ----
+    None.
+    """
+
+    # ---- 1 Check the inputs ----------------------------------------------------------
+    if not isinstance(degree, (int, np.integer)) or degree < 1:
+        raise ValueError('Baseline degree must be an integer of at least 1.')
+
+    # ---- 2 Average the spectra -------------------------------------------------------
+    mean_wavelengths = np.mean(wavelengths, axis=1)
+    mean_spectrum = np.mean(spectra, axis=1)
+
+    # ---- 3 Select the fit range ------------------------------------------------------
+    mask = np.ones(mean_wavelengths.shape, dtype=bool)
+    if x_min is not None:
+        mask &= mean_wavelengths >= x_min
+    if x_max is not None:
+        mask &= mean_wavelengths <= x_max
+    if len(np.unique(mean_wavelengths[mask])) <= degree:
+        raise ValueError(f'Polynomial degree {degree} needs more than {degree} unique '
+                         f'wavelengths in the baseline range.',
+                         )
+
+    # ---- 4 Fit and subtract the baseline ---------------------------------------------
+    coefficients = np.polyfit(mean_wavelengths[mask], mean_spectrum[mask], deg=degree)
+    shared_baseline = np.polyval(coefficients, wavelengths)
+    return spectra - shared_baseline, shared_baseline
+
+
+# ---- time_label_builder --------------------------------------------------------------
+def time_label_builder(experiment_name: str,
+                       label_format: str = '{hours:g} hours',
+                       ) -> str:
+    """
+    ---- Summary ----
+    Main function to build the label of a time point from the experiment name.
+
+    ---- Inputs ----
+    experiment_name : str
+        Experiment name such as 'control_7hours'.
+    label_format : str
+        Format string with an {hours} field.
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    str
+        For example '7 hours'; the experiment name when it contains no hours.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    hours_parser
+    """
+
+    hours = hours_parser(experiment_name)
+    return (label_format.format(hours=hours)
+            if hours is not None
+            else str(experiment_name)
+            )
+
+
+# ---- time_response_figure_plotter ----------------------------------------------------
+def time_response_figure_plotter(experiments: dict,
+                                 config: dict,
+                                 individual_config: dict,
+                                 ) -> tuple:
+    """
+    ---- Summary ----
+    Main function to build the time response figure as a 3 x 3 grid. Plots 1 and 4 are
+    the waterfalls of the two groups, plots 2-3 and 5-6 are two kinetic traces (each
+    spanning two columns) and plots 7, 8 and 9 are three decomposition plots.
+
+    ---- Inputs ----
+    experiments : dict
+        Experiment dictionaries keyed by experiment name, as defined in DATA_FORMAT.md.
+    config : dict
+        Time response settings from custom_config.time_response_config_builder.
+    individual_config : dict
+        Individual-experiment plot settings, as returned by Config.plot_config in
+        config.py.
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    tuple
+        (fig, axes); axes maps the panel letters 'A'-'G' (reading order) to axes; the
+        kinetic traces give their list of axes.
+
+    ---- Globals mutated ----
+    None. Sets ``fig.time_response_picks`` (the examples shown, used by the exporter)
+    (side effect).
+
+    ---- Equations ----
+    The legend of the waterfalls hangs under plot 4 and the legend of the kinetic traces
+    under plots 5-6, both in the gap above the decomposition row; the three
+    decomposition plots share the width left of one legend at the far right.
+
+    ---- Helpers ----
+    _event_label_height_calculator
+    _example_finder
+    _example_viewer
+    _haem_scale_sharer
+    _time_gap_calculator
+    _title_styler
+    decomposition_plotter
+    experiment_drawer
+    figure_canvas_fitter
+    gap_space_calculator
+    group_collector
+    hours_parser
+    panel_letter_adder
+    stack_legend_drawer
+    waterfall_plotter
+    """
+
+    # ---- 1 Validate and select the examples ------------------------------------------
+    group_order = tuple(config['GROUP_ORDER'])
+    if len(group_order) != 2:
+        raise ValueError('GROUP_ORDER must list exactly two groups (rows 1 and 2).')
+    if len(config['EXAMPLES']) != 2:
+        raise ValueError('EXAMPLES must list exactly two (group, hours) examples.')
+    if len(config['DECOMPOSITION_EXAMPLES']) != 3:
+        raise ValueError('DECOMPOSITION_EXAMPLES must list exactly three (group, '
+                         'hours) examples.',
+                         )
+    if config['PANEL_LETTER_CASE'] not in ('upper', 'lower'):
+        raise ValueError('PANEL_LETTER_CASE must be "upper" or "lower".')
+    groups = group_collector(experiments, config)
+    kinetic_picks = [(group,) + _example_finder(groups, group, hours)
+                     for group, hours in config['EXAMPLES']
+                     ]
+    decomposition_picks = [(group,) + _example_finder(groups, group, hours)
+                           for group, hours in config['DECOMPOSITION_EXAMPLES']
+                           ]
+    # The letter of each kinetic trace panel, written beside its waterfall trace.
+    marks = {}
+    for letter, (picked, label, _) in zip('BD', kinetic_picks):
+        letter = letter.lower() if config['PANEL_LETTER_CASE'] == 'lower' else letter
+        text = marks.setdefault(picked, {}).get(label)
+        marks[picked][label] = f'{text}, {letter})' if text else f'{letter})'
+    skipped = {float(hours) for hours in config['SKIP_HOURS']}
+    waterfall_groups = {group: [item for item in items
+                                if hours_parser(item[1]['experiment_name']) not in
+                                skipped
+                                ]
+                        for group, items in groups.items()
+                        }
+    empty = [group for group, items in waterfall_groups.items() if not items]
+    if empty:
+        raise ValueError(f"Every time point of {', '.join(empty)} is skipped; nothing "
+                         f'is left for its waterfall.',
+                         )
+    example_config = {**individual_config,
+                      **config.get('EXAMPLE_PLOT_OVERRIDES', {}),
+                      'PLOT_AVERAGING_WINDOWS': True,
+                      'AVERAGING_WINDOWS_KEY': 'averages',
+                      }
+    example_config['SHOW_LEGENDS'] = {'oxygen': False, 'vo2': False, 'haem': False}
+    # The short example panels cannot hold a one-line haem label, so it takes two lines
+    # (name, then units).
+    example_config['HAEM_AXIS_LABELS'] = {key: label.replace(' (', '\n(', 1)
+                                          for key, label
+                                          in example_config['HAEM_AXIS_LABELS'].items()
+                                          }
+    label_height = _event_label_height_calculator([experiment
+                                                   for _, _, experiment in kinetic_picks
+                                                   ],
+                                                  example_config,
+                                                  )
+
+    # ---- 2 Size the legends and the gaps ---------------------------------------------
+    unit, font = config['UNIT_PT'], config['LEGEND_FONT_SIZE']
+    width_pt, height_pt = (v * 72.0 for v in config['FIGURE_SIZE'])
+    first_decomposition = decomposition_picks[0][2]['difference_decomposition']
+    haem_count = len(first_decomposition['haem_names'])
+    waterfall_labels = [label for label, _ in waterfall_groups[group_order[0]]]
+    kinetic_count = 2 + haem_count
+    entry_width = (2.8 + 0.55 * max(len(label) for label in waterfall_labels)) * font
+    kinetic_entry_width = (2.8 + 0.55 * 13) * font
+    column_gap = _time_gap_calculator(config, example_config, label_height, 1)[2]
+    column_width = (width_pt - 8 * unit - 2 * column_gap) / 3.0
+    fits = int(column_width // entry_width)
+    waterfall_columns = max(1, min(len(waterfall_labels), fits))
+    kinetic_fits = int((2 * column_width + column_gap) // kinetic_entry_width)
+    kinetic_columns = max(1, min(kinetic_count, kinetic_fits))
+    legend_rows = max(math.ceil(len(waterfall_labels) / waterfall_columns),
+                      math.ceil(kinetic_count / kinetic_columns),
+                      )
+    gap_1, gap_2, column_gap = _time_gap_calculator(config,
+                                                    example_config,
+                                                    label_height,
+                                                    legend_rows,
+                                                    )
+    below_pt = (1.2 * config['TICK_FONT_SIZE'] + 0.5 * unit +
+                example_config['TIME_AXIS_LABEL_PAD'] +
+                1.2 * config['AXIS_LABEL_FONT_SIZE'] + 0.3 * unit
+                )
+
+    # ---- 3 Create the figure grid ----------------------------------------------------
+    fig = plt.figure(figsize=config['FIGURE_SIZE'], dpi=config['FIGURE_DPI'])
+    content_pt = height_pt - 6 * unit - gap_1 - gap_2
+    weights = config['HEIGHT_RATIOS']
+    heights = [content_pt * weight / sum(weights) for weight in weights]
+    outer = GridSpec(5,
+                     1,
+                     figure=fig,
+                     height_ratios=[heights[0], gap_1, heights[1], gap_2, heights[2]],
+                     hspace=0.0,
+                     )
+    wspace = gap_space_calculator(column_gap, width_pt - 8 * unit, 3)
+    rows = [outer[0].subgridspec(1, 3, wspace=wspace),
+            outer[2].subgridspec(1, 3, wspace=wspace),
+            ]
+    # The decomposition row: the three plots are squeezed into the width left of one
+    # legend at the far right.
+    legend_width = (2.6 + 0.55 * 8 + 1.4) * font + 1.0 * unit
+    bottom = outer[4].subgridspec(1,
+                                  2,
+                                  width_ratios=[width_pt - 8 * unit - legend_width,
+                                                legend_width,
+                                                ],
+                                  wspace=0.0,
+                                  )
+    decomposition_wspace = gap_space_calculator(column_gap,
+                                                width_pt - 8 * unit - legend_width,
+                                                3,
+                                                )
+    decomposition_grid = bottom[0, 0].subgridspec(1,
+                                                  3,
+                                                  wspace=decomposition_wspace,
+                                                  )
+
+    # ---- 4 Draw the waterfalls and the kinetic traces --------------------------------
+    axes, panels = {}, []
+    for row, group in enumerate(group_order):
+        ax = fig.add_subplot(rows[row][0, 0])
+        _title_styler(ax, config['GROUP_TITLES'].get(group, group), config)
+        waterfall_plotter(ax,
+                          waterfall_groups[group],
+                          config,
+                          show_legend=False,
+                          marked=marks.get(group, {}),
+                          )
+        letter = 'AC'[row]
+        axes[letter] = ax
+        panels.append((letter, ax, [ax]))
+        picked_group, label, experiment = kinetic_picks[row]
+        known = {id(other) for other in fig.axes}
+        stack, _ = experiment_drawer(fig,
+                                     rows[row][0, 1:3],
+                                     _example_viewer(experiment),
+                                     example_config,
+                                     )
+        # the panels and the invisible axes that carries the shared label
+        members = [other for other in fig.axes if id(other) not in known]
+        letter = 'BD'[row]
+        axes[letter] = stack
+        panels.append((letter, stack[0], members))
+
+    # ---- 5 Draw the decomposition plots ----------------------------------------------
+    decomposition_axes = []
+    for column, (group, label, experiment) in enumerate(decomposition_picks):
+        ax = fig.add_subplot(decomposition_grid[0, column])
+        group_title = config['GROUP_TITLES'].get(group, group)
+        _title_styler(ax,
+                      config['EXAMPLE_TITLE_FORMAT'].format(group=group_title,
+                                                            time=label,
+                                                            ),
+                      config,
+                      )
+        decomposition_plotter(ax,
+                              experiment['difference_decomposition'],
+                              config,
+                              show_legend=False,
+                              )
+        decomposition_axes.append(ax)
+        letter = 'EFG'[column]
+        axes[letter] = ax
+        panels.append((letter, ax, [ax]))
+
+    # ---- 6 Give each haem one scale across the two kinetic traces --------------------
+    _haem_scale_sharer([axes['B'], axes['D']], example_config)
+
+    # ---- 7 Draw the legends ----------------------------------------------------------
+    # The waterfall legend hangs under plot 4 and the kinetic legend under plots 5-6,
+    # both in the gap above the decomposition row.
+    handles, labels = axes['A'].get_legend_handles_labels()
+    lower = axes['C']
+    legend_shift = ScaledTranslation(0, -below_pt / 72.0, fig.dpi_scale_trans)
+    legend = lower.legend(handles,
+                          labels,
+                          loc='upper center',
+                          bbox_to_anchor=(0.5, 0.0),
+                          bbox_transform=lower.transAxes + legend_shift,
+                          ncol=waterfall_columns,
+                          frameon=config['LEGEND_FRAME'],
+                          fontsize=font,
+                          borderaxespad=0,
+                          )
+    if config['LEGEND_FRAME']:
+        legend.get_frame().set_linewidth(config['THIN_LINE_WIDTH'])
+    legend = stack_legend_drawer(axes['D'],
+                                 example_config,
+                                 below_pt=below_pt,
+                                 columns=kinetic_columns,
+                                 )
+    if legend is not None and config['LEGEND_FRAME']:
+        legend.get_frame().set_linewidth(config['THIN_LINE_WIDTH'])
+    legend_ax = fig.add_subplot(bottom[0, 1], frameon=False)
+    legend_ax.axis('off')
+    handles, labels = decomposition_axes[-1].get_legend_handles_labels()
+    legend = legend_ax.legend(handles,
+                              labels,
+                              loc='center left',
+                              bbox_to_anchor=(0.0, 0.5),
+                              frameon=config['LEGEND_FRAME'],
+                              fontsize=font,
+                              borderaxespad=0,
+                              )
+    if config['LEGEND_FRAME']:
+        legend.get_frame().set_linewidth(config['THIN_LINE_WIDTH'])
+
+    # ---- 8 Fit margins and add panel letters -----------------------------------------
+    panels.sort(key=lambda panel: panel[0])
+    suptitle = (fig.suptitle(config['FIGURE_TITLE'],
+                             fontsize=config['SUPTITLE_FONT_SIZE'],
+                             fontweight='bold',
+                             )
+                if config['FIGURE_TITLE']
+                else None
+                )
+    pad, gap = config['EDGE_PAD_PT'], config['TITLE_GAP_PT']
+    figure_canvas_fitter(fig, pad, suptitle, gap)
+    if config['PANEL_LETTERS']:
+        panel_letter_adder(fig,
+                           panels,
+                           config['PANEL_LETTER_FONT_SIZE'],
+                           config['PANEL_LETTER_CASE'],
+                           )
+    figure_canvas_fitter(fig, pad, suptitle, gap)
+    fig.time_response_picks = {'kinetic': [(group, label, experiment['experiment_name'])
+                                           for group, label, experiment
+                                           in kinetic_picks
+                                           ],
+                               'decomposition': [(group,
+                                                  label,
+                                                  experiment['experiment_name'],
+                                                  )
+                                                 for group, label, experiment
+                                                 in decomposition_picks
+                                                 ],
+                               'skipped_hours': sorted(skipped),
+                               }
+    return fig, axes
+
+
+# ---- waterfall_plotter ---------------------------------------------------------------
+def waterfall_plotter(ax: Axes,
+                      items: list,
+                      config: dict,
+                      show_legend: bool = True,
+                      marked: Optional[dict] = None,
+                      ) -> None:
+    """
+    ---- Summary ----
+    Main function to draw the offset difference spectra of one group, first time point
+    at the top, with additive peak alignment.
+
+    ---- Inputs ----
+    ax : Axes
+        Matplotlib axes to draw on.
+    items : list
+        [(time label, experiment), ...] of one group.
+    config : dict
+        Figure settings dictionary built in custom_config.py.
+    show_legend : bool
+        True to draw the legend.
+    marked : Optional[dict]
+        {time label: text} written in black just past the right end of that trace; the
+        text is the letter of the kinetic trace panel drawn from that time point.
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    None
+        Nothing.
+
+    ---- Globals mutated ----
+    None. Draws on ``ax`` (side effect).
+
+    ---- Equations ----
+    aligned = S + (1 - max of S within [ALIGN_MIN, ALIGN_MAX]); shifted_i = aligned_i -
+    min(aligned_i) + (n - 1 - i) x offset; offset defaults to 0.75 x the largest span.
+
+    ---- Helpers ----
+    _haem_window_drawer
+    _legend_drawer
+    _time_axes_styler
+    shared_baseline_subtracter
+    """
+
+    # ---- 1 Collect the spectra -------------------------------------------------------
+    wavelengths = [item[1]['difference_spectrum']['wavelengths'] for item in items]
+    spectra = [item[1]['difference_spectrum']['spectrum'] for item in items]
+    labels = [item[0] for item in items]
+    n_points = len(spectra)
+
+    # ---- 2 Align the peaks -----------------------------------------------------------
+    align_min, align_max = config['ALIGN_MIN'], config['ALIGN_MAX']
+    if align_min is not None and align_max is not None and align_min >= align_max:
+        raise ValueError('ALIGN_MIN must be smaller than ALIGN_MAX.')
+    if config['WATERFALL_SHARED_BASELINE']:
+        if len({len(w) for w in wavelengths}) != 1:
+            raise ValueError('WATERFALL_SHARED_BASELINE needs every spectrum on the '
+                             'same wavelength grid.',
+                             )
+        corrected, _ = shared_baseline_subtracter(np.column_stack(wavelengths),
+                                                  np.column_stack(spectra),
+                                                  config['WATERFALL_BASELINE_X_MIN'],
+                                                  config['WATERFALL_BASELINE_X_MAX'],
+                                                  config['WATERFALL_BASELINE_DEGREE'],
+                                                  )
+        spectra = [corrected[:, i] for i in range(n_points)]
+    # Additive alignment: the maximum within the alignment window is shifted to 1; shape
+    # and scale are preserved.
+    in_range, aligned = [], []
+    for w, s in zip(wavelengths, spectra):
+        mask = np.ones(w.shape, dtype=bool)
+        if align_min is not None:
+            mask &= w >= align_min
+        if align_max is not None:
+            mask &= w <= align_max
+        if not mask.any():
+            raise ValueError('The alignment range contains no data for at least one '
+                             'spectrum.',
+                             )
+        in_range.append(mask)
+        aligned.append(s + (1.0 - np.max(s[mask])))
+    minima = np.array([np.min(a[m]) for a, m in zip(aligned, in_range)])
+    maxima = np.array([np.max(a[m]) for a, m in zip(aligned, in_range)])
+    maximum_span = np.max(maxima - minima)
+
+    # ---- 3 Offset and draw -----------------------------------------------------------
+    offset = config['WATERFALL_OFFSET']
+    if offset is None:
+        offset = maximum_span * 0.75 if maximum_span > 0 else 1.0
+    if offset <= 0:
+        raise ValueError('WATERFALL_OFFSET must be positive.')
+    x_min, x_max = config['X_MIN'], config['X_MAX']
+    displayed = []
+    for i in range(n_points):
+        shifted = aligned[i] - minima[i] + (n_points - 1 - i) * offset
+        line, = ax.plot(wavelengths[i],
+                        shifted,
+                        label=labels[i],
+                        linewidth=config['LINE_WIDTH'],
+                        )
+        keep = np.ones(len(shifted), dtype=bool)
+        if x_min is not None:
+            keep &= wavelengths[i] >= x_min
+        if x_max is not None:
+            keep &= wavelengths[i] <= x_max
+        displayed.extend(shifted[keep])
+        if labels[i] in (marked or {}) and keep.any():
+            ax.annotate(marked[labels[i]],
+                        xy=(wavelengths[i][keep][-1], shifted[keep][-1]),
+                        xytext=(3, 0),
+                        textcoords='offset points',
+                        color='black',
+                        fontsize=config['AXIS_LABEL_FONT_SIZE'],
+                        ha='left',
+                        va='center',
+                        annotation_clip=False,
+                        )
+    if x_min is not None or x_max is not None:
+        ax.set_xlim(left=x_min, right=x_max)
+    # ---- 4 Style the axes ------------------------------------------------------------
+    ax.set_xlabel('Wavelength (nm)', fontsize=config['AXIS_LABEL_FONT_SIZE'])
+    ax.set_ylabel(config['WATERFALL_Y_LABEL'], fontsize=config['AXIS_LABEL_FONT_SIZE'])
+    _time_axes_styler(ax, config)
+    ax.set_yticks([])
+    _haem_window_drawer(ax, items[0][1]['difference_decomposition'], config)
+    if show_legend:
+        _legend_drawer(ax,
+                       config,
+                       config['WATERFALL_LEGEND_LOCATION'],
+                       config['WATERFALL_LEGEND_COLUMNS'],
+                       outside=config['WATERFALL_LEGEND_OUTSIDE'],
+                       )
+    if displayed:
+        low, high = np.min(displayed), np.max(displayed)
+        padding = (high - low) * 0.01 if high > low else 0.05
+        ax.set_ylim(low - padding, high + padding)

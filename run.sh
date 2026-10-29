@@ -48,7 +48,7 @@ if [ ! -x ".venv_unix/bin/python" ]; then
         rm -rf .venv_unix; pause; exit 1
     fi
     if ! .venv_unix/bin/python -m pip install --quiet --upgrade pip \
-       || ! .venv_unix/bin/python -m pip install --quiet numpy pandas matplotlib xlsxwriter openpyxl; then
+       || ! .venv_unix/bin/python -m pip install --quiet numpy pandas scipy matplotlib xlsxwriter openpyxl; then
         echo
         echo "Setup failed. Check your internet connection and try again."
         rm -rf .venv_unix; pause; exit 1
@@ -57,5 +57,5 @@ if [ ! -x ".venv_unix/bin/python" ]; then
     echo
 fi
 
-.venv_unix/bin/python DePalencify.py
+.venv_unix/bin/python main.py
 pause

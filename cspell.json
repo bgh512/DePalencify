@@ -1,0 +1,13 @@
+{
+    "version": "0.2",
+    "import": [
+        "./style/configs/cspell.json"
+    ],
+    "ignorePaths": [
+        "style/**",
+        ".venv/**",
+        "build/**",
+        "logs/**"
+    ],
+    "words": []
+}

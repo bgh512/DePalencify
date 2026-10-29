@@ -1,146 +1,282 @@
-# -*- coding: utf-8 -*-
-"""Event-window averaging of VoO2 and haem data for one experiment (either may be left out)."""
-# %% IMPORTS -----------------------------------------------------------------------------------------------------------------------------------------
+"""
+Event-window averaging of OCR and haem data for one experiment.
+"""
+
+# ---- STANDARD IMPORTS ----------------------------------------------------------------
+from typing import Dict, Optional
+
+# ---- 3RD PARTY IMPORTS ---------------------------------------------------------------
 import numpy as np
+import pandas as pd
 
-from utils_shared.schema import (VO2_KEYS, HAEM_KEYS, DELTA_HAEM_SOURCES, get_times, get_values,
-                                 measurement_columns, resolve_source)
-# %% WINDOW STATISTICS -------------------------------------------------------------------------------------------------------------------------------
+# ---- LOCAL IMPORTS -------------------------------------------------------------------
+from utils_shared.schema import (DELTA_HAEM_SOURCES,
+                                 HAEM_KEYS,
+                                 measurement_column_finder,
+                                 source_resolver,
+                                 time_getter,
+                                 value_getter,
+                                 VO2_KEYS,
+                                 )
 
 
-def window_statistics(df, start_time, end_time):
+# ---- AVERAGING HELPERS ---------------------------------------------------------------
+
+
+# ---- _baseline_change_adder ----------------------------------------------------------
+def _baseline_change_adder(window_stats: Dict[str, Dict[str, float]],
+                           baseline_stats: Dict[str, Dict[str, float]],
+                           percent_of_baseline: bool = True,
+                           ) -> None:
     """
-    Mean and sample SD of every measurement column within [start_time, end_time]
+    ---- Summary ----
+    Helper function to add the change from the baseline window to the statistics of a
+    window.
 
-    Returns ``{column: {"mean": float, "sd": float}}``; values are NaN when no (or, for the
-    SD, fewer than two) finite points fall inside the window.
+    ---- Inputs ----
+    window_stats : Dict[str, Dict[str, float]]
+        Statistics of one window, from window_statistics_calculator; modified in place.
+    baseline_stats : Dict[str, Dict[str, float]]
+        Statistics of the baseline window (average0).
+    percent_of_baseline : bool
+        False for sources that already are a change from a reference (baseline near 0),
+        where a percentage is meaningless.
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    None
+        Nothing.
+
+    ---- Globals mutated ----
+    window_stats: adds "delta" and "change" to every column.
+
+    ---- Equations ----
+    delta = mean - baseline_mean; change = mean / baseline_mean x 100 (NaN if
+    percent_of_baseline is False, the baseline is 0 or a value is not finite).
+
+    ---- Helpers ----
+    None.
     """
-    times = get_times(df)
-    in_window = np.isfinite(times) & (times >= start_time) & (times <= end_time)
 
-    stats = {}
-    for column in measurement_columns(df):
-        values = get_values(df, column)
-        selected = values[in_window & np.isfinite(values)]
-        stats[str(column)] = {
-            "mean": float(np.mean(selected)) if selected.size else np.nan,
-            "sd": float(np.std(selected, ddof=1)) if selected.size >= 2 else np.nan,
-        }
-    return stats
-
-
-def _add_change_from_baseline(window_stats, baseline_stats, percent_of_baseline=True):
-    """
-    Add ``change`` (window mean as % of the baseline mean) and ``delta`` (window mean minus baseline mean)
-
-    ``change`` is NaN when ``percent_of_baseline`` is False (a source that is already a change from a reference, such as
-    delta abs, has a baseline near 0, so a percentage of it is meaningless).
-    """
+    # ---- 1 Add the change from the baseline ------------------------------------------
     for column, stats in window_stats.items():
-        baseline = baseline_stats.get(column, {}).get("mean", np.nan)
-        stats["delta"] = stats["mean"] - baseline if np.isfinite(baseline) and np.isfinite(stats["mean"]) else np.nan
+        baseline = baseline_stats.get(column, {}).get('mean', np.nan)
+        stats['delta'] = (stats['mean'] - baseline if np.isfinite(baseline) and
+                          np.isfinite(stats['mean']) else np.nan
+                          )
+        usable = (np.isfinite(baseline)
+                  and not np.isclose(baseline, 0.0)
+                  and np.isfinite(stats['mean'])
+                  )
         if not percent_of_baseline:
-            stats["change"] = np.nan
-        elif np.isfinite(baseline) and not np.isclose(baseline, 0.0) and np.isfinite(stats["mean"]):
-            stats["change"] = stats["mean"] / baseline * 100.0
+            stats['change'] = np.nan
+        elif usable:
+            stats['change'] = stats['mean'] / baseline * 100.0
         else:
-            stats["change"] = np.nan
-# %% EXPERIMENT AVERAGES -----------------------------------------------------------------------------------------------------------------------------
+            stats['change'] = np.nan
 
 
-def calculate_experiment_averages(experiment,
-                                  window_minutes,
-                                  gap_minutes,
-                                  final_window_gap_minutes=0.5,
-                                  vo2_source="od",
-                                  haem_source="abs"):   # either source may be None to leave that measurement out
+# ---- MAIN FUNCTIONS ------------------------------------------------------------------
+
+
+# ---- experiment_averages_calculator --------------------------------------------------
+def experiment_averages_calculator(experiment: dict,
+                                   window_minutes: float,
+                                   gap_minutes: float,
+                                   final_window_gap_minutes: float = 0.5,
+                                   vo2_source: Optional[str] = 'od',
+                                   haem_source: Optional[str] = 'abs',
+                                   ) -> dict:
     """
-    Calculate event-window statistics and store them in ``experiment["averages"]``
+    ---- Summary ----
+    Main function to calculate event-window statistics for VoO2 and haem data and store
+    them in the experiment.
 
-    Windows:
-        average0 = baseline window ending ``gap_minutes`` before the first event
-        averageN = window ending ``gap_minutes`` before event N+1 (or
-                   ``final_window_gap_minutes`` before the end of the recording for the last event)
+    ---- Inputs ----
+    experiment : dict
+        Experiment dictionary, as defined in DATA_FORMAT.md.
+    window_minutes : float
+        Length of each averaging window, in minutes (> 0).
+    gap_minutes : float
+        How long before the next addition each window ends, in minutes (>= 0).
+    final_window_gap_minutes : float
+        How long before the end of the recording the last window ends, in minutes (>=
+        0).
+    vo2_source : Optional[str]
+        VoO2 source key (e.g. 'od', 'raw', 'percent'); None leaves VoO2 out.
+    haem_source : Optional[str]
+        Haem source key (e.g. 'abs', 'delta_abs_od'); None leaves the haems out.
 
-    Result layout::
+    ---- Globals read ----
+    schema.VO2_KEYS, HAEM_KEYS and DELTA_HAEM_SOURCES; schema.resolve_source, get_times.
 
-        experiment["averages"] = {
-            "settings": {...},
-            "windows": {"average0": {"start_time", "end_time",
-                                     "vo2":  {column: {"mean", "sd", "change", "delta"}},
-                                     "haem": {column: {"mean", "sd", "change", "delta"}}},
-                        "average1": {...}, ...},
-        }
+    ---- Outputs ----
+    dict
+        The same experiment dictionary. Raises ValueError for invalid settings, no
+        source, no events, invalid times or windows that do not fit between the
+        additions.
 
-    ``change`` is the window mean as a percentage of the average0 mean (average0 = 100 %); it is NaN for the delta abs
-    haem sources ("delta_abs", "delta_abs_od"), which start at 0 and are never scaled to a percentage.
-    ``delta`` is the window mean minus the average0 mean, in the units of the source (mOD for the "abs" haem source).
-    The window ``mean`` is the source's own value (for the delta abs sources, the change from the start-of-run reference).
+    ---- Globals mutated ----
+    experiment: adds experiment["averages"] = {"settings", "windows"} (layout in
+    DATA_FORMAT.md).
+
+    ---- Equations ----
+    average0 ends gap_minutes before the first event; averageN ends gap_minutes before
+    event N+1 (final_window_gap_minutes before the end of the recording for the last
+    event); each window starts window_minutes before its end. change = mean /
+    mean(average0) x 100 (NaN for delta abs sources); delta = mean - mean(average0).
+
+    ---- Helpers ----
+    _baseline_change_adder
+    source_resolver
+    time_getter
+    window_statistics_calculator
     """
-    name = experiment["experiment_name"]
 
+    # ---- 1 Validate the inputs -------------------------------------------------------
+    name = experiment['experiment_name']
     if window_minutes <= 0:
-        raise ValueError("window_minutes must be positive.")
+        raise ValueError('window_minutes must be positive.')
     if gap_minutes < 0 or final_window_gap_minutes < 0:
-        raise ValueError("Averaging gaps cannot be negative.")
-
+        raise ValueError('Averaging gaps cannot be negative.')
     if vo2_source is None and haem_source is None:
-        raise ValueError(f"{name}: nothing to average (no VO2 and no haem source).")
-    vo2_key, vo2_df = resolve_source(experiment, vo2_source, VO2_KEYS, "VO2") if vo2_source else (None, None)
-    haem_key, haem_df = resolve_source(experiment, haem_source, HAEM_KEYS, "haem") if haem_source else (None, None)
+        raise ValueError(f'{name}: nothing to average (no VO2 and no haem source).')
 
-    events = sorted(experiment["metadata"].get("events", []), key=lambda event: event["time"])
+    # ---- 2 Resolve the data sources --------------------------------------------------
+    vo2_key, vo2_df = (source_resolver(experiment, vo2_source, VO2_KEYS, 'VO2')
+                       if vo2_source
+                       else (None, None)
+                       )
+    haem_key, haem_df = (source_resolver(experiment, haem_source, HAEM_KEYS, 'haem')
+                         if haem_source
+                         else (None, None)
+                         )
+
+    # ---- 3 Define the windows --------------------------------------------------------
+    events = sorted(experiment['metadata'].get('events', []),
+                    key=lambda event: event['time'],
+                    )
     if not events:
-        raise ValueError(f"{name}: no timed events found for averaging.")
-
+        raise ValueError(f'{name}: no timed events found for averaging.')
     reference_df = vo2_df if vo2_df is not None else haem_df
-    reference_times = get_times(reference_df)
+    reference_times = time_getter(reference_df)
     if not np.any(np.isfinite(reference_times)):
-        raise ValueError(f"{name}: no valid times.")
+        raise ValueError(f'{name}: no valid times.')
     recording_end = float(np.nanmax(reference_times))
-
     # Define the averaging windows.
-    first_event = float(events[0]["time"])
-    boundaries = [("average0", first_event - gap_minutes - window_minutes, first_event - gap_minutes)]
-
+    first_event = float(events[0]['time'])
+    boundaries = [('average0',
+                   first_event - gap_minutes - window_minutes,
+                   first_event - gap_minutes,
+                   ),
+                  ]
     for i, event in enumerate(events):
-        event_time = float(event["time"])
+        event_time = float(event['time'])
         if i + 1 < len(events):
-            end = float(events[i + 1]["time"]) - gap_minutes
-            problem = f"insufficient time between additions {i + 1} and {i + 2}."
+            end = float(events[i + 1]['time']) - gap_minutes
+            problem = f'insufficient time between additions {i + 1} and {i + 2}.'
         else:
             end = recording_end - final_window_gap_minutes
-            problem = "insufficient recording time after the final addition."
+            problem = 'insufficient recording time after the final addition.'
         start = end - window_minutes
         if start < event_time:
-            raise ValueError(f"{name}: {problem}")
-        boundaries.append((f"average{i + 1}", start, end))
+            raise ValueError(f'{name}: {problem}')
+        boundaries.append((f'average{i + 1}', start, end))
 
+    # ---- 4 Calculate the window statistics -------------------------------------------
     windows = {}
     for window_name, start, end in boundaries:
-        windows[window_name] = {
-            "start_time": start,
-            "end_time": end,
-            "vo2": window_statistics(vo2_df, start, end) if vo2_df is not None else {},
-            "haem": window_statistics(haem_df, start, end) if haem_df is not None else {},
-        }
+        windows[window_name] = {'start_time': start,
+                                'end_time': end,
+                                'vo2': window_statistics_calculator(vo2_df, start, end)
+                                if vo2_df is not None
+                                else {},
+                                'haem': window_statistics_calculator(haem_df,
+                                                                     start,
+                                                                     end,
+                                                                     )
+                                if haem_df is not None
+                                else {},
+                                }
 
-    baseline = windows["average0"]
+    # ---- 5 Store the results ---------------------------------------------------------
+    baseline = windows['average0']
+    haem_is_absolute = haem_source not in DELTA_HAEM_SOURCES
     for window in windows.values():
-        _add_change_from_baseline(window["vo2"], baseline["vo2"])
-        _add_change_from_baseline(window["haem"], baseline["haem"],
-                                  percent_of_baseline=haem_source not in DELTA_HAEM_SOURCES)
-
-    experiment["averages"] = {
-        "settings": {
-            "window_minutes": window_minutes,
-            "gap_minutes": gap_minutes,
-            "final_window_gap_minutes": final_window_gap_minutes,
-            "vo2_source": vo2_source,
-            "vo2_key": vo2_key,
-            "haem_source": haem_source,
-            "haem_key": haem_key,
-        },
-        "windows": windows,
-    }
+        _baseline_change_adder(window['vo2'], baseline['vo2'])
+        _baseline_change_adder(window['haem'],
+                               baseline['haem'],
+                               percent_of_baseline=haem_is_absolute,
+                               )
+    final_gap = final_window_gap_minutes
+    experiment['averages'] = {'settings': {'window_minutes': window_minutes,
+                                           'gap_minutes': gap_minutes,
+                                           'final_window_gap_minutes': final_gap,
+                                           'vo2_source': vo2_source,
+                                           'vo2_key': vo2_key,
+                                           'haem_source': haem_source,
+                                           'haem_key': haem_key,
+                                           },
+                              'windows': windows,
+                              }
     return experiment
+
+
+# ---- window_statistics_calculator ----------------------------------------------------
+def window_statistics_calculator(df: pd.DataFrame,
+                                 start_time: float,
+                                 end_time: float,
+                                 ) -> Dict[str, Dict[str, float]]:
+    """
+    ---- Summary ----
+    Main function to calculate the mean and sample SD of every measurement column inside
+    a time window.
+
+    ---- Inputs ----
+    df : pd.DataFrame
+        Data frame with a time column and measurement columns (DATA_FORMAT.md).
+    start_time : float
+        Window start, in minutes.
+    end_time : float
+        Window end, in minutes.
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    Dict[str, Dict[str, float]]
+        {column: {"mean", "sd"}}. Values are NaN when no finite point falls in the
+        window (SD: fewer than two).
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    mean = sum(x) / n; SD = sqrt(sum((x - mean)^2) / (n - 1)) over the finite points
+    with start_time <= t <= end_time.
+
+    ---- Helpers ----
+    measurement_column_finder
+    time_getter
+    value_getter
+    """
+
+    # ---- 1 Select the window ---------------------------------------------------------
+    times = time_getter(df)
+    in_window = np.isfinite(times) & (times >= start_time) & (times <= end_time)
+
+    # ---- 2 Calculate the statistics --------------------------------------------------
+    stats = {}
+    for column in measurement_column_finder(df):
+        values = value_getter(df, column)
+        selected = values[in_window & np.isfinite(values)]
+        stats[str(column)] = {'mean': float(np.mean(selected))
+                              if selected.size
+                              else np.nan,
+                              'sd': float(np.std(selected, ddof=1))
+                              if selected.size >= 2
+                              else np.nan,
+                              }
+    return stats

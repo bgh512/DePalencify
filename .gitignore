@@ -1,18 +1,48 @@
-# Python environments (Windows .venv, Mac/Linux .venv_unix)
+# ---- managed block (style/configs/gitignore_block.txt) ----
 .venv/
 .venv_unix/
-venv/
-env/
-
-# Python cache
 __pycache__/
 *.pyc
+.ruff_cache/
+build/
+logs/
+*_data/
+# ---- end managed block ----
 
-# Shortcut flag
+# ---- project ----
+last_answers.json
 .shortcut_made
 
-# Private or local data
-fiazall_data/
-last_answers.json
-export/
-*.paf
+# >>> style guide (managed block, do not edit between these lines) >>>
+# Python environments and caches
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.ruff_cache/
+.pytest_cache/
+.mypy_cache/
+*.egg-info/
+
+# C++ build output
+build/
+*.o
+*.obj
+*.a
+*.so
+*.dylib
+*.pyd
+
+# Run logs and generated packs
+logs/
+claude_pack/
+
+# Real data: any folder whose name ends in _data is never committed
+*_data/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# .vscode/ is NOT ignored: shared settings and spellings are committed
+# <<< style guide <<<

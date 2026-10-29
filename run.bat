@@ -53,13 +53,13 @@ if not exist ".venv\Scripts\python.exe" (
     %PY% -m venv .venv
     if errorlevel 1 goto :setup_failed
     ".venv\Scripts\python.exe" -m pip install --quiet --upgrade pip
-    ".venv\Scripts\python.exe" -m pip install --quiet numpy pandas matplotlib xlsxwriter openpyxl
+    ".venv\Scripts\python.exe" -m pip install --quiet numpy pandas scipy matplotlib xlsxwriter openpyxl
     if errorlevel 1 goto :setup_failed
     echo Setup finished.
     echo.
 )
 
-".venv\Scripts\python.exe" DePalencify.py
+".venv\Scripts\python.exe" main.py
 echo.
 pause
 exit /b 0
