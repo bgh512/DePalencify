@@ -11,3 +11,37 @@ logs/
 
 # ---- project ----
 last_answers.json
+
+# >>> style guide (managed block, do not edit between these lines) >>>
+# Python environments and caches
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.ruff_cache/
+.pytest_cache/
+.mypy_cache/
+*.egg-info/
+
+# C++ build output
+build/
+*.o
+*.obj
+*.a
+*.so
+*.dylib
+*.pyd
+
+# Run logs and generated packs
+logs/
+claude_pack/
+
+# Real data: any folder whose name ends in _data is never committed
+*_data/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# .vscode/ is NOT ignored: shared settings and spellings are committed
+# <<< style guide <<<
