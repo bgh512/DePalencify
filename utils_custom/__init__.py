@@ -1,1 +1,3 @@
-"""Custom publication figures (haem/OCR response, time response)."""
+"""
+Custom publication figures (haem/OCR response, time response).
+"""

@@ -1,4 +1,6 @@
-"""Preparation of single experiments and drawing of the custom figures."""
+"""
+Preparation of single experiments and drawing of the custom figures.
+"""
 
 # ---- STANDARD IMPORTS ----------------------------------------------------------------
 from pathlib import Path
@@ -10,38 +12,36 @@ import matplotlib.pyplot as plt
 # ---- LOCAL IMPORTS -------------------------------------------------------------------
 import config as settings
 from config import Config
-from utils_custom.custom_config import (DATA_SUBFOLDER,
-                                        exemplar_config_builder,
+from utils_custom.custom_config import (exemplar_config_builder,
                                         individual_config_builder,
-                                        publication_config_builder,
+                                        ocr_and_haem_response_config_builder,
                                         source_selector,
                                         time_response_config_builder,
                                         )
-from utils_custom.publication_plotter import (exemplar_figure_plotter,
-                                              publication_figure_plotter,
-                                              publication_figure_saver,
-                                              )
+from utils_custom.custom_figure_saver import custom_figure_saver
+from utils_custom.exemplar_plotter import exemplar_figure_plotter
+from utils_custom.ocr_and_haem_response_exporter import ocr_and_haem_response_exporter
+from utils_custom.ocr_and_haem_response_plotter import (
+    ocr_and_haem_response_figure_plotter,
+)
 from utils_custom.spectral_difference import (difference_spectrum_calculator,
                                               difference_spectrum_decomposer,
                                               spectral_averager,
                                               )
 from utils_custom.time_response_exporter import time_response_exporter
-from utils_custom.time_response_plotter import (time_response_figure_plotter,
-                                                time_response_figure_saver,
-                                                )
+from utils_custom.time_response_plotter import time_response_figure_plotter
 from utils_custom.triplicate_averager import triplicate_averager
-from utils_custom.triplicate_exporter import triplicate_exporter
 from utils_shared.averaging import experiment_averages_calculator
 
 
 # ---- CUSTOM RUNNER HELPERS -----------------------------------------------------------
 
 
-# ---- _HAEM OCR PREPARER --------------------------------------------------------------
-def _haem_ocr_preparer(experiment: dict,
-                       answers: dict,
-                       od_available: bool,
-                       ) -> Optional[dict]:
+# ---- _ocr_and_haem_response_preparer -------------------------------------------------
+def _ocr_and_haem_response_preparer(experiment: dict,
+                                    answers: dict,
+                                    od_available: bool,
+                                    ) -> Optional[dict]:
     """
     ---- Summary ----
     Helper function to calculate the event-window averages used by the haem and OCR
@@ -98,7 +98,7 @@ def _haem_ocr_preparer(experiment: dict,
     return prepared
 
 
-# ---- _TIME RESPONSE PREPARER ---------------------------------------------------------
+# ---- _time_response_preparer ---------------------------------------------------------
 def _time_response_preparer(experiment: dict,
                             group: str,
                             answers: dict,
@@ -167,7 +167,7 @@ def _time_response_preparer(experiment: dict,
 # ---- MAIN FUNCTIONS ------------------------------------------------------------------
 
 
-# ---- EXEMPLAR RUNNER -----------------------------------------------------------------
+# ---- exemplar_runner -----------------------------------------------------------------
 def exemplar_runner(chosen: dict,
                     cfg: Config,
                     answers: dict,
@@ -194,7 +194,7 @@ def exemplar_runner(chosen: dict,
         Results folder.
 
     ---- Globals read ----
-    custom_config.OUTPUT_SUBFOLDER, custom_config.DATA_SUBFOLDER.
+    None.
 
     ---- Outputs ----
     None
@@ -207,10 +207,10 @@ def exemplar_runner(chosen: dict,
     None.
 
     ---- Helpers ----
+    custom_figure_saver
     exemplar_config_builder
     exemplar_figure_plotter
     individual_config_builder
-    publication_figure_saver
     """
 
     # ---- 1 Choose the data plotted ---------------------------------------------------
@@ -230,11 +230,11 @@ def exemplar_runner(chosen: dict,
     # ---- 2 Draw and save the figure --------------------------------------------------
     config = exemplar_config_builder(cfg, answers)
     fig, _ = exemplar_figure_plotter(experiments, config, individual)
-    publication_figure_saver(fig, export_root, config)
+    custom_figure_saver(fig, export_root, config)
     plt.close(fig)
 
 
-# ---- EXPERIMENT PREPARER -------------------------------------------------------------
+# ---- experiment_preparer -------------------------------------------------------------
 def experiment_preparer(experiment: dict,
                         custom: dict,
                         answers: dict,
@@ -273,7 +273,7 @@ def experiment_preparer(experiment: dict,
     None.
 
     ---- Helpers ----
-    _haem_ocr_preparer
+    _ocr_and_haem_response_preparer
     _time_response_preparer
     """
 
@@ -296,10 +296,10 @@ def experiment_preparer(experiment: dict,
     # ---- 3 Prepare the haem and OCR response -----------------------------------------
     if custom.get('haem_ocr'):
         try:
-            prepared['haem_ocr'] = _haem_ocr_preparer(experiment,
-                                                      answers,
-                                                      od_available,
-                                                      )
+            prepared['haem_ocr'] = _ocr_and_haem_response_preparer(experiment,
+                                                                   answers,
+                                                                   od_available,
+                                                                   )
             if prepared['haem_ocr'] is not None:
                 print('  Haem and OCR response: event averages calculated')
         except (KeyError, ValueError, TypeError) as exc:
@@ -307,18 +307,18 @@ def experiment_preparer(experiment: dict,
     return prepared
 
 
-# ---- HAEM OCR RUNNER -----------------------------------------------------------------
-def haem_ocr_runner(experiments: dict,
-                    cfg: Config,
-                    answers: dict,
-                    fit: dict,
-                    export_root: Path,
-                    ) -> None:
+# ---- ocr_and_haem_response_runner ----------------------------------------------------
+def ocr_and_haem_response_runner(experiments: dict,
+                                 cfg: Config,
+                                 answers: dict,
+                                 fit: dict,
+                                 export_root: Path,
+                                 ) -> None:
     """
     ---- Summary ----
-    Main function to combine the runs of each condition and draw the haem and OCR
-    response: the publication figure and the four-run exemplar figure. The two
-    figures are drawn independently, so a problem with one does not stop the other.
+    Main function to combine the runs of each condition, draw the OCR and haem response
+    figure and write the workbook behind it. A problem with the figure does not stop
+    the workbook, and neither stops the 2x2 figure, which is drawn separately.
 
     ---- Inputs ----
     experiments : dict
@@ -333,24 +333,25 @@ def haem_ocr_runner(experiments: dict,
         Results folder.
 
     ---- Globals read ----
-    custom_config.OUTPUT_SUBFOLDER, custom_config.DATA_SUBFOLDER.
+    None.
 
     ---- Outputs ----
     None
         Nothing; files are written.
 
     ---- Globals mutated ----
-    None. Writes the workbook and the figure files (side effect).
+    None. Writes ocr_and_haem_response.xlsx and the figure files to ``export_root``
+    (side effect).
 
     ---- Equations ----
     None.
 
     ---- Helpers ----
-    publication_config_builder
-    publication_figure_plotter
-    publication_figure_saver
+    custom_figure_saver
+    ocr_and_haem_response_config_builder
+    ocr_and_haem_response_exporter
+    ocr_and_haem_response_figure_plotter
     triplicate_averager
-    triplicate_exporter
     """
 
     # ---- 1 Combine the runs of each condition ----------------------------------------
@@ -358,22 +359,29 @@ def haem_ocr_runner(experiments: dict,
     if not triplicates:
         print('  Not made: every condition needs at least two runs with averages.')
         return
-    workbook = Path(export_root) / DATA_SUBFOLDER / 'triplicate_summary.xlsx'
-    triplicate_exporter(triplicates, workbook)
 
-    # ---- 2 Publication figure --------------------------------------------------------
+    # ---- 2 Draw and save the figure --------------------------------------------------
     haem_names = list(fit['haem_list'])
+    config = ocr_and_haem_response_config_builder(cfg, answers, haem_names)
+    tests, baseline = [], None
     try:
-        config = publication_config_builder(cfg, answers, haem_names)
-        fig, _ = publication_figure_plotter(experiments, triplicates, config)
-        publication_figure_saver(fig, export_root, config)
+        fig, _ = ocr_and_haem_response_figure_plotter(experiments, triplicates, config)
+        tests, baseline = fig.response_tests, fig.response_baseline
+        custom_figure_saver(fig, export_root, config)
         plt.close(fig)
-    except Exception as exc:  # keep the exemplar figure going
-        print(f'  Publication figure not made: {type(exc).__name__}: {exc}')
+    except Exception as exc:  # keep the workbook and the 2x2 figure going
+        print(f'  OCR and haem response figure not made: {type(exc).__name__}: {exc}')
         plt.close('all')
 
+    # ---- 3 Write the workbook --------------------------------------------------------
+    ocr_and_haem_response_exporter(triplicates,
+                                   tests,
+                                   baseline,
+                                   Path(export_root) / f"{config['FILE_NAME']}.xlsx",
+                                   )
 
-# ---- TIME RESPONSE RUNNER ------------------------------------------------------------
+
+# ---- time_response_runner ------------------------------------------------------------
 def time_response_runner(experiments: dict,
                          cfg: Config,
                          answers: dict,
@@ -382,8 +390,8 @@ def time_response_runner(experiments: dict,
                          ) -> None:
     """
     ---- Summary ----
-    Main function to export and draw the time response figure from the prepared
-    experiments.
+    Main function to draw the time response figure from the prepared experiments and
+    write the workbook behind it.
 
     ---- Inputs ----
     experiments : dict
@@ -399,24 +407,25 @@ def time_response_runner(experiments: dict,
         Results folder.
 
     ---- Globals read ----
-    custom_config.OUTPUT_SUBFOLDER, custom_config.DATA_SUBFOLDER.
+    None.
 
     ---- Outputs ----
     None
         Nothing; files are written.
 
     ---- Globals mutated ----
-    None. Writes the CSV summaries and the figure files (side effect).
+    None. Writes time_response.xlsx and the figure files to ``export_root`` (side
+    effect).
 
     ---- Equations ----
     None.
 
     ---- Helpers ----
+    custom_figure_saver
     individual_config_builder
     time_response_config_builder
     time_response_exporter
     time_response_figure_plotter
-    time_response_figure_saver
     """
 
     # ---- 1 Choose the data plotted in the examples -----------------------------------
@@ -429,11 +438,15 @@ def time_response_runner(experiments: dict,
     individual = individual_config_builder(answers, vo2_source, haem_source, haem_names)
     config = time_response_config_builder(cfg, answers, haem_names)
 
-    # ---- 2 Export the summary tables -------------------------------------------------
-    folder = Path(export_root) / config['DATA_SUBFOLDER']
-    time_response_exporter(experiments, folder, config['TIME_LABEL_FORMAT'])
-
-    # ---- 3 Draw and save the figure --------------------------------------------------
+    # ---- 2 Draw and save the figure --------------------------------------------------
     fig, _ = time_response_figure_plotter(experiments, config, individual)
-    time_response_figure_saver(fig, export_root, config)
+    picks = fig.time_response_picks
+    custom_figure_saver(fig, export_root, config)
     plt.close(fig)
+
+    # ---- 3 Write the workbook --------------------------------------------------------
+    time_response_exporter(experiments,
+                           config,
+                           picks,
+                           Path(export_root) / f"{config['FILE_NAME']}.xlsx",
+                           )

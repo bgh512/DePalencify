@@ -1,4 +1,6 @@
-"""Experiment (run) name parsing: conditions, run numbers, groups and hours."""
+"""
+Experiment (run) name parsing: conditions, run numbers, groups and hours.
+"""
 
 # ---- STANDARD IMPORTS ----------------------------------------------------------------
 import re
@@ -6,6 +8,7 @@ from typing import Optional, Sequence
 
 
 # ---- CONSTANTS -----------------------------------------------------------------------
+ORDER_TITLES = {'kcn_then_bd': 'KCN → BD', 'bd_then_kcn': 'BD → KCN'}
 RUN_NAME_PATTERN = re.compile(r'^(?P<condition>.*?)[\s_-]*run[\s_-]*(?P<run>\d+)\s*$',
                               re.IGNORECASE,
                               )
@@ -15,7 +18,7 @@ HOURS_PATTERN = re.compile(r'(\d+(?:\.\d+)?)\s*(?:hours?|hrs?|h)\b', re.IGNORECA
 # ---- RUN NAMER HELPERS ---------------------------------------------------------------
 
 
-# ---- _GROUP MATCHER ------------------------------------------------------------------
+# ---- _group_matcher ------------------------------------------------------------------
 def _group_matcher(name: str, groups: Sequence[str]) -> Optional[str]:
     """
     ---- Summary ----
@@ -52,7 +55,7 @@ def _group_matcher(name: str, groups: Sequence[str]) -> Optional[str]:
     return None
 
 
-# ---- _NATURAL SORTER -----------------------------------------------------------------
+# ---- _natural_sorter -----------------------------------------------------------------
 def _natural_sorter(name: str) -> list:
     """
     ---- Summary ----
@@ -84,10 +87,48 @@ def _natural_sorter(name: str) -> list:
             ]
 
 
+# ---- _order_sorter -------------------------------------------------------------------
+def _order_sorter(item: tuple, groups: Sequence[str]) -> tuple:
+    """
+    ---- Summary ----
+    Helper function to build the sort key of one (group, name, experiment) item.
+
+    ---- Inputs ----
+    item : tuple
+        (group, name, experiment).
+    groups : Sequence[str]
+        Group names in the wanted order.
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    tuple
+        (group index, no-hours flag, hours, natural name key).
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    _natural_sorter
+    hours_parser
+    """
+
+    hours = hours_parser(item[1])
+    return (list(groups).index(item[0]),
+            hours is None,
+            hours or 0.0,
+            _natural_sorter(item[1]),
+            )
+
+
 # ---- MAIN FUNCTIONS ------------------------------------------------------------------
 
 
-# ---- CONDITION CLASSIFIER ------------------------------------------------------------
+# ---- condition_classifier ------------------------------------------------------------
 def condition_classifier(condition: str) -> tuple:
     """
     ---- Summary ----
@@ -138,7 +179,7 @@ def condition_classifier(condition: str) -> tuple:
     return strain, order
 
 
-# ---- CONDITION GROUPER ---------------------------------------------------------------
+# ---- condition_grouper ---------------------------------------------------------------
 def condition_grouper(experiments: dict) -> dict:
     """
     ---- Summary ----
@@ -184,7 +225,44 @@ def condition_grouper(experiments: dict) -> dict:
     return groups
 
 
-# ---- GROUP ASSIGNER ------------------------------------------------------------------
+# ---- experiment_classifier -----------------------------------------------------------
+def experiment_classifier(name: str) -> tuple:
+    """
+    ---- Summary ----
+    Helper function to identify the strain, addition order and run number from an
+    experiment name.
+
+    ---- Inputs ----
+    name : str
+        Experiment name such as 'control_kcn_then_bd_run1'.
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    tuple
+        (strain, order, run); entries are None where they cannot be identified.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    condition_classifier
+    run_name_parser
+    """
+
+    parsed = run_name_parser(name)
+    if parsed is None:
+        return None, None, None
+    condition, run = parsed
+    strain, order = condition_classifier(condition)
+    return strain, order, run
+
+
+# ---- group_assigner ------------------------------------------------------------------
 def group_assigner(experiments: dict, groups: Sequence[str]) -> dict:
     """
     ---- Summary ----
@@ -215,9 +293,7 @@ def group_assigner(experiments: dict, groups: Sequence[str]) -> dict:
 
     ---- Helpers ----
     _group_matcher
-    _natural_sorter
     _order_sorter
-    hours_parser
     """
 
     # ---- 1 Match the groups ----------------------------------------------------------
@@ -231,46 +307,11 @@ def group_assigner(experiments: dict, groups: Sequence[str]) -> dict:
             continue
         experiment['group'] = group
         found.append((group, name, experiment))
-
-    # ---- 2 Order by group, then hours, then name -------------------------------------
-    def _order_sorter(item: tuple) -> tuple:
-        """
-        ---- Summary ----
-        Helper function to build the sort key of one (group, name, experiment) item.
-
-        ---- Inputs ----
-        item : tuple
-            (group, name, experiment).
-
-        ---- Globals read ----
-        None.
-
-        ---- Outputs ----
-        tuple
-            (group index, no-hours flag, hours, natural name key).
-
-        ---- Globals mutated ----
-        None.
-
-        ---- Equations ----
-        None.
-
-        ---- Helpers ----
-        _natural_sorter
-        hours_parser
-        """
-
-        hours = hours_parser(item[1])
-        return (list(groups).index(item[0]),
-                hours is None,
-                hours or 0.0,
-                _natural_sorter(item[1]),
-                )
-    found.sort(key=_order_sorter)
+    found.sort(key=lambda item: _order_sorter(item, groups))
     return {name: experiment for _, name, experiment in found}
 
 
-# ---- HOURS PARSER --------------------------------------------------------------------
+# ---- hours_parser --------------------------------------------------------------------
 def hours_parser(name: str) -> Optional[float]:
     """
     ---- Summary ----
@@ -301,7 +342,7 @@ def hours_parser(name: str) -> Optional[float]:
     return float(match.group(1)) if match else None
 
 
-# ---- RUN NAME LISTER -----------------------------------------------------------------
+# ---- run_name_lister -----------------------------------------------------------------
 def run_name_lister(names: Sequence[str]) -> list:
     """
     ---- Summary ----
@@ -349,7 +390,7 @@ def run_name_lister(names: Sequence[str]) -> list:
     return rows
 
 
-# ---- RUN NAME PARSER -----------------------------------------------------------------
+# ---- run_name_parser -----------------------------------------------------------------
 def run_name_parser(name: str) -> Optional[tuple]:
     """
     ---- Summary ----

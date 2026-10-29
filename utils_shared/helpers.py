@@ -1,12 +1,10 @@
-# -*- coding: utf-8 -*-
 """
-Small, generic utilities shared by several modules (names, file names, Excel sheet
-names).
+Small, generic utilities shared by several modules.
 """
 
 # ---- STANDARD IMPORTS ----------------------------------------------------------------
-from pathlib import Path
 import re
+from pathlib import Path
 from typing import Any, List, Sequence, Tuple
 
 # ---- 3RD PARTY IMPORTS ---------------------------------------------------------------
@@ -16,7 +14,7 @@ from matplotlib.figure import Figure
 # ---- MAIN FUNCTIONS ------------------------------------------------------------------
 
 
-# ---- CONCENTRATION FORMATTER ---------------------------------------------------------
+# ---- concentration_formatter ---------------------------------------------------------
 def concentration_formatter(concentration_um: Any) -> str:
     """
     ---- Summary ----
@@ -55,7 +53,7 @@ def concentration_formatter(concentration_um: Any) -> str:
     return f'{value:g} µM'
 
 
-# ---- EXCEL SHEET NAMER ---------------------------------------------------------------
+# ---- excel_sheet_namer ---------------------------------------------------------------
 def excel_sheet_namer(name: Any, used: set) -> str:
     """
     ---- Summary ----
@@ -96,7 +94,7 @@ def excel_sheet_namer(name: Any, used: set) -> str:
     return candidate
 
 
-# ---- FIGURE SAVER --------------------------------------------------------------------
+# ---- figure_saver --------------------------------------------------------------------
 def figure_saver(fig: Figure,
                  folder: Path,
                  stem: str,
@@ -162,7 +160,7 @@ def figure_saver(fig: Figure,
     return paths
 
 
-# ---- FILE NAME SANITISER -------------------------------------------------------------
+# ---- file_name_sanitiser -------------------------------------------------------------
 def file_name_sanitiser(name: Any, default: str = 'experiment') -> str:
     """
     ---- Summary ----
@@ -195,7 +193,7 @@ def file_name_sanitiser(name: Any, default: str = 'experiment') -> str:
     return cleaned or default
 
 
-# ---- NAME SIMPLIFIER -----------------------------------------------------------------
+# ---- name_simplifier -----------------------------------------------------------------
 def name_simplifier(value: Any) -> str:
     """
     ---- Summary ----

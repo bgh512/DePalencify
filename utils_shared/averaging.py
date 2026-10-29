@@ -1,7 +1,5 @@
-# -*- coding: utf-8 -*-
 """
-Event-window averaging of VoO2 and haem data for one experiment (either may be left
-out).
+Event-window averaging of OCR and haem data for one experiment.
 """
 
 # ---- STANDARD IMPORTS ----------------------------------------------------------------
@@ -25,7 +23,7 @@ from utils_shared.schema import (DELTA_HAEM_SOURCES,
 # ---- AVERAGING HELPERS ---------------------------------------------------------------
 
 
-# ---- _BASELINE CHANGE ADDER ----------------------------------------------------------
+# ---- _baseline_change_adder ----------------------------------------------------------
 def _baseline_change_adder(window_stats: Dict[str, Dict[str, float]],
                            baseline_stats: Dict[str, Dict[str, float]],
                            percent_of_baseline: bool = True,
@@ -68,12 +66,13 @@ def _baseline_change_adder(window_stats: Dict[str, Dict[str, float]],
         stats['delta'] = (stats['mean'] - baseline if np.isfinite(baseline) and
                           np.isfinite(stats['mean']) else np.nan
                           )
+        usable = (np.isfinite(baseline)
+                  and not np.isclose(baseline, 0.0)
+                  and np.isfinite(stats['mean'])
+                  )
         if not percent_of_baseline:
             stats['change'] = np.nan
-        elif (np.isfinite(baseline) and
-              not np.isclose(baseline, 0.0) and
-              np.isfinite(stats['mean'])
-              ):
+        elif usable:
             stats['change'] = stats['mean'] / baseline * 100.0
         else:
             stats['change'] = np.nan
@@ -82,7 +81,7 @@ def _baseline_change_adder(window_stats: Dict[str, Dict[str, float]],
 # ---- MAIN FUNCTIONS ------------------------------------------------------------------
 
 
-# ---- EXPERIMENT AVERAGES CALCULATOR --------------------------------------------------
+# ---- experiment_averages_calculator --------------------------------------------------
 def experiment_averages_calculator(experiment: dict,
                                    window_minutes: float,
                                    gap_minutes: float,
@@ -211,23 +210,21 @@ def experiment_averages_calculator(experiment: dict,
                                baseline['haem'],
                                percent_of_baseline=haem_is_absolute,
                                )
-    experiment['averages'] = ({'settings': {'window_minutes': window_minutes,
-                                            'gap_minutes': gap_minutes,
-                                            'final_window_gap_minutes': (
-                                                final_window_gap_minutes
-                                            ),
-                                            'vo2_source': vo2_source,
-                                            'vo2_key': vo2_key,
-                                            'haem_source': haem_source,
-                                            'haem_key': haem_key,
-                                            },
-                               'windows': windows,
-                               }
-                              )
+    final_gap = final_window_gap_minutes
+    experiment['averages'] = {'settings': {'window_minutes': window_minutes,
+                                           'gap_minutes': gap_minutes,
+                                           'final_window_gap_minutes': final_gap,
+                                           'vo2_source': vo2_source,
+                                           'vo2_key': vo2_key,
+                                           'haem_source': haem_source,
+                                           'haem_key': haem_key,
+                                           },
+                              'windows': windows,
+                              }
     return experiment
 
 
-# ---- WINDOW STATISTICS CALCULATOR ----------------------------------------------------
+# ---- window_statistics_calculator ----------------------------------------------------
 def window_statistics_calculator(df: pd.DataFrame,
                                  start_time: float,
                                  end_time: float,

@@ -1,8 +1,10 @@
-"""Numbered terminal questions of the main program (sections 1 to 5)."""
+"""
+Numbered terminal questions of the main program (sections 1 to 5).
+"""
 
 # ---- STANDARD IMPORTS ----------------------------------------------------------------
-from pathlib import Path
 import re
+from pathlib import Path
 from typing import Callable, Dict, List, Optional, Tuple
 
 # ---- LOCAL IMPORTS -------------------------------------------------------------------
@@ -43,7 +45,7 @@ OCR_LABELS = {'raw': 'OCR (µM min⁻¹)',
 # ---- SURVEY HELPERS ------------------------------------------------------------------
 
 
-# ---- _COLUMNS TEXT BUILDER -----------------------------------------------------------
+# ---- _columns_text_builder -----------------------------------------------------------
 def _columns_text_builder(columns: float) -> str:
     """
     ---- Summary ----
@@ -74,7 +76,7 @@ def _columns_text_builder(columns: float) -> str:
     return f"{columns:g} column{'' if columns == 1 else 's'}"
 
 
-# ---- _EVENT LINE BUILDER -------------------------------------------------------------
+# ---- _event_line_builder -------------------------------------------------------------
 def _event_line_builder(event: dict, entry: dict) -> str:
     """
     ---- Summary ----
@@ -112,7 +114,69 @@ def _event_line_builder(event: dict, entry: dict) -> str:
     return f"  {event['time']:.2f} min: {entry['label']}{conc}{note}"
 
 
-# ---- _LIMITS ASKER -------------------------------------------------------------------
+# ---- _first_event_finder -------------------------------------------------------------
+def _first_event_finder(summary: dict) -> float:
+    """
+    ---- Summary ----
+    Helper function to find the time of the first event of an experiment.
+
+    ---- Inputs ----
+    summary : dict
+        Experiment summary with events and duration_min.
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    float
+        First event time in minutes; the duration when there are no events.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    None.
+    """
+
+    return min((e['time'] for e in summary['events']),
+               default=summary['duration_min'],
+               )
+
+
+# ---- _last_event_finder --------------------------------------------------------------
+def _last_event_finder(summary: dict) -> float:
+    """
+    ---- Summary ----
+    Helper function to find the time of the last event of an experiment.
+
+    ---- Inputs ----
+    summary : dict
+        Experiment summary with events.
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    float
+        Last event time in minutes; 0 when there are no events.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    None.
+    """
+
+    return max((e['time'] for e in summary['events']), default=0.0)
+
+
+# ---- _limits_asker -------------------------------------------------------------------
 def _limits_asker(summaries: List[dict],
                   remembered: dict,
                   key: str,
@@ -216,7 +280,40 @@ def _limits_asker(summaries: List[dict],
     return limits
 
 
-# ---- _NATURAL SORTER -----------------------------------------------------------------
+# ---- _maths_converter ----------------------------------------------------------------
+def _maths_converter(match: 're.Match') -> str:
+    """
+    ---- Summary ----
+    Helper function to convert the contents of one $...$ maths span to plain text
+    with Unicode subscripts and italic letters.
+
+    ---- Inputs ----
+    match : re.Match
+        Match whose group 1 is the text between the dollar signs.
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    str
+        The converted text.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    _subscript_stripper
+text_italiser
+    """
+
+    inner = re.sub(r'_\{([^}]*)\}|_(.)', _subscript_stripper, match.group(1))
+    return text_italiser(inner.replace('\\', ''))
+
+
+# ---- _natural_sorter -----------------------------------------------------------------
 def _natural_sorter(name: str) -> list:
     """
     ---- Summary ----
@@ -248,10 +345,41 @@ def _natural_sorter(name: str) -> list:
     return [int(part) if part.isdigit() else part for part in parts]
 
 
+# ---- _subscript_stripper -------------------------------------------------------------
+def _subscript_stripper(match: 're.Match') -> str:
+    """
+    ---- Summary ----
+    Helper function to turn a matched subscript (_x or _{xy}) into plain text, since
+    Unicode subscripts are hard to read in a terminal.
+
+    ---- Inputs ----
+    match : re.Match
+        Match whose group 1 or 2 holds the subscript text.
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    str
+        The subscript text without the underscore.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    None.
+    """
+
+    return match.group(1) if match.group(1) is not None else match.group(2)
+
+
 # ---- MAIN FUNCTIONS ------------------------------------------------------------------
 
 
-# ---- ANALYSIS ASKER ------------------------------------------------------------------
+# ---- analysis_asker ------------------------------------------------------------------
 def analysis_asker(summaries: List[dict],
                    answers: dict,
                    defaults: dict,
@@ -351,11 +479,12 @@ def analysis_asker(summaries: List[dict],
         for summary in complete:
             if summary not in to_ask:
                 old = saved[summary['name']]
+                dilution = old.get('dilution_factor', 1.0)
                 details[summary['name']].update({'OD': old['OD'],
                                                  'volume': old['volume'],
-                                                 'dilution_factor': old.get(
-                                                     'dilution_factor', 1.0),
-                                                 })
+                                                 'dilution_factor': dilution,
+                                                 },
+                                                )
         if to_ask:
             for name, values in od_asker(to_ask, saved).items():
                 details[name].update(values)
@@ -369,7 +498,7 @@ def analysis_asker(summaries: List[dict],
     return fit, details
 
 
-# ---- AVERAGING ASKER -----------------------------------------------------------------
+# ---- averaging_asker -----------------------------------------------------------------
 def averaging_asker(answers: dict,
                     defaults: dict,
                     forced: bool = False,
@@ -436,7 +565,7 @@ def averaging_asker(answers: dict,
     answers['window_asked'] = True
 
 
-# ---- DECOMPOSITION ASKER -------------------------------------------------------------
+# ---- decomposition_asker -------------------------------------------------------------
 def decomposition_asker(summaries: List[dict],
                         defaults: dict,
                         fits_folder: Path,
@@ -537,7 +666,7 @@ def decomposition_asker(summaries: List[dict],
     return True, fit_file, fit, dataset
 
 
-# ---- EVENT ASKER ---------------------------------------------------------------------
+# ---- event_asker ---------------------------------------------------------------------
 def event_asker(summaries: List[dict], saved: dict) -> Dict[str, List[dict]]:
     """
     ---- Summary ----
@@ -641,7 +770,7 @@ def event_asker(summaries: List[dict], saved: dict) -> Dict[str, List[dict]]:
     return result
 
 
-# ---- FILES ASKER ---------------------------------------------------------------------
+# ---- files_asker ---------------------------------------------------------------------
 def files_asker(last: dict) -> Tuple[Path, List[dict], Path]:
     """
     ---- Summary ----
@@ -733,7 +862,7 @@ def files_asker(last: dict) -> Tuple[Path, List[dict], Path]:
     return folder, summaries, Path(path_cleaner(text)).expanduser()
 
 
-# ---- HAEM FORM OPTION BUILDER --------------------------------------------------------
+# ---- haem_form_option_builder --------------------------------------------------------
 def haem_form_option_builder(include_percent: bool) -> List[Tuple[str, str]]:
     """
     ---- Summary ----
@@ -771,7 +900,7 @@ def haem_form_option_builder(include_percent: bool) -> List[Tuple[str, str]]:
     return options
 
 
-# ---- HAEM NAME FORMATTER -------------------------------------------------------------
+# ---- haem_name_formatter -------------------------------------------------------------
 def haem_name_formatter(name: str) -> str:
     """
     ---- Summary ----
@@ -798,74 +927,13 @@ def haem_name_formatter(name: str) -> str:
 
     ---- Helpers ----
     _maths_converter
-    _subscript_stripper
-    text_italiser
     """
 
-    # ---- 1 Define the converters -----------------------------------------------------
-    def _subscript_stripper(match: 're.Match') -> str:
-        """
-        ---- Summary ----
-        Helper function to turn a matched subscript (_x or _{xy}) into plain text, since
-        Unicode subscripts are hard to read in a terminal.
-
-        ---- Inputs ----
-        match : re.Match
-            Match whose group 1 or 2 holds the subscript text.
-
-        ---- Globals read ----
-        None.
-
-        ---- Outputs ----
-        str
-            The subscript text without the underscore.
-
-        ---- Globals mutated ----
-        None.
-
-        ---- Equations ----
-        None.
-
-        ---- Helpers ----
-        None.
-        """
-
-        return match.group(1) if match.group(1) is not None else match.group(2)
-    def _maths_converter(match: 're.Match') -> str:
-        """
-        ---- Summary ----
-        Helper function to convert the contents of one $...$ maths span to plain text
-        with Unicode subscripts and italic letters.
-
-        ---- Inputs ----
-        match : re.Match
-            Match whose group 1 is the text between the dollar signs.
-
-        ---- Globals read ----
-        None.
-
-        ---- Outputs ----
-        str
-            The converted text.
-
-        ---- Globals mutated ----
-        None.
-
-        ---- Equations ----
-        None.
-
-        ---- Helpers ----
-        _subscript_stripper, text_italiser
-        """
-
-        inner = re.sub(r'_\{([^}]*)\}|_(.)', _subscript_stripper, match.group(1))
-        return text_italiser(inner.replace('\\', ''))
-
-    # ---- 2 Convert the maths spans ---------------------------------------------------
+    # ---- 1 Convert the maths spans ---------------------------------------------------
     return re.sub(r'\$([^$]*)\$', _maths_converter, str(name))
 
 
-# ---- HAEM NAME SORTER ----------------------------------------------------------------
+# ---- haem_name_sorter ----------------------------------------------------------------
 def haem_name_sorter(names: List[str]) -> List[str]:
     """
     ---- Summary ----
@@ -896,7 +964,7 @@ def haem_name_sorter(names: List[str]) -> List[str]:
     return sorted(names, key=name_simplifier)
 
 
-# ---- MULTI EXPERIMENT ASKER ----------------------------------------------------------
+# ---- multi_experiment_asker ----------------------------------------------------------
 def multi_experiment_asker(summaries: List[dict],
                            answers: dict,
                            defaults: dict,
@@ -1036,7 +1104,7 @@ def multi_experiment_asker(summaries: List[dict],
     return comparison, exemplar_names
 
 
-# ---- OCR OPTION BUILDER --------------------------------------------------------------
+# ---- ocr_option_builder --------------------------------------------------------------
 def ocr_option_builder(keys: List[str]) -> List[Tuple[str, str]]:
     """
     ---- Summary ----
@@ -1067,7 +1135,7 @@ def ocr_option_builder(keys: List[str]) -> List[Tuple[str, str]]:
     return [(key, OCR_LABELS[key]) for key in keys]
 
 
-# ---- OD ASKER ------------------------------------------------------------------------
+# ---- od_asker ------------------------------------------------------------------------
 def od_asker(summaries: List[dict], saved: dict) -> Dict[str, dict]:
     """
     ---- Summary ----
@@ -1135,7 +1203,7 @@ def od_asker(summaries: List[dict], saved: dict) -> Dict[str, dict]:
     return values
 
 
-# ---- PAF FINDER ----------------------------------------------------------------------
+# ---- paf_finder ----------------------------------------------------------------------
 def paf_finder(folder: Path) -> List[Path]:
     """
     ---- Summary ----
@@ -1169,7 +1237,7 @@ def paf_finder(folder: Path) -> List[Path]:
     return sorted(files, key=lambda p: _natural_sorter(p.name))
 
 
-# ---- PLOT ASKER ----------------------------------------------------------------------
+# ---- plot_asker ----------------------------------------------------------------------
 def plot_asker(answers: dict, defaults: dict, fit: Optional[dict]) -> bool:
     """
     ---- Summary ----
@@ -1285,7 +1353,7 @@ def plot_asker(answers: dict, defaults: dict, fit: Optional[dict]) -> bool:
     return plotted
 
 
-# ---- SIZE ASKER ----------------------------------------------------------------------
+# ---- size_asker ----------------------------------------------------------------------
 def size_asker(answers: dict,
                defaults: dict,
                keys: dict,
@@ -1384,7 +1452,7 @@ def size_asker(answers: dict,
                                            )
 
 
-# ---- TRIM ASKER ----------------------------------------------------------------------
+# ---- trim_asker ----------------------------------------------------------------------
 def trim_asker(summaries: List[dict], remembered: dict) -> Dict[str, dict]:
     """
     ---- Summary ----
@@ -1426,63 +1494,7 @@ def trim_asker(summaries: List[dict], remembered: dict) -> Dict[str, dict]:
                  )
     collected = {s['name']: {} for s in summaries}
 
-    # ---- 2 Ask the four questions ----------------------------------------------------
-    def _first_event_finder(summary: dict) -> float:
-        """
-        ---- Summary ----
-        Helper function to find the time of the first event of an experiment.
-
-        ---- Inputs ----
-        summary : dict
-            Experiment summary with events and duration_min.
-
-        ---- Globals read ----
-        None.
-
-        ---- Outputs ----
-        float
-            First event time in minutes; the duration when there are no events.
-
-        ---- Globals mutated ----
-        None.
-
-        ---- Equations ----
-        None.
-
-        ---- Helpers ----
-        None.
-        """
-
-        return min((e['time'] for e in summary['events']),
-                   default=summary['duration_min'],
-                   )
-    def _last_event_finder(summary: dict) -> float:
-        """
-        ---- Summary ----
-        Helper function to find the time of the last event of an experiment.
-
-        ---- Inputs ----
-        summary : dict
-            Experiment summary with events.
-
-        ---- Globals read ----
-        None.
-
-        ---- Outputs ----
-        float
-            Last event time in minutes; 0 when there are no events.
-
-        ---- Globals mutated ----
-        None.
-
-        ---- Equations ----
-        None.
-
-        ---- Helpers ----
-        None.
-        """
-
-        return max((e['time'] for e in summary['events']), default=0.0)
+    # ---- 2 Describe the four questions -----------------------------------------------
     plan = (('trim_start',
              'Do you want to TRIM the START of any of the data?',
              'At what time (minutes) should {name} start?',

@@ -1,18 +1,13 @@
-# Python environments (Windows .venv, Mac/Linux .venv_unix)
+# ---- managed block (style/configs/gitignore_block.txt) ----
 .venv/
 .venv_unix/
-venv/
-env/
-
-# Python cache
 __pycache__/
 *.pyc
-
-# Shortcut flag
-.shortcut_made
-
-# Private or local data
+.ruff_cache/
+build/
+logs/
 *_data/
+# ---- end managed block ----
+
+# ---- project ----
 last_answers.json
-export/
-*.paf

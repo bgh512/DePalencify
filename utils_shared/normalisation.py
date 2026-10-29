@@ -1,7 +1,6 @@
-# -*- coding: utf-8 -*-
-"""Normalisation of VoO2 and haem data: OD normalisation (of VoO2, haem concentration,
-haem abs and haem delta abs) and relative (0-100 %) scaling (of VoO2 and haem
-concentration only)."""
+"""
+Normalisation of OCR and haem data by OD and to a relative scale.
+"""
 
 # ---- STANDARD IMPORTS ----------------------------------------------------------------
 from typing import Any, Union
@@ -17,7 +16,7 @@ from utils_shared.schema import measurement_column_finder, time_getter
 # ---- NORMALISATION HELPERS -----------------------------------------------------------
 
 
-# ---- _FRAME NORMALISER ---------------------------------------------------------------
+# ---- _frame_normaliser ---------------------------------------------------------------
 def _frame_normaliser(df: pd.DataFrame, **kwargs: Any) -> pd.DataFrame:
     """
     ---- Summary ----
@@ -58,7 +57,7 @@ def _frame_normaliser(df: pd.DataFrame, **kwargs: Any) -> pd.DataFrame:
 # ---- MAIN FUNCTIONS ------------------------------------------------------------------
 
 
-# ---- DATA NORMALISER -----------------------------------------------------------------
+# ---- data_normaliser -----------------------------------------------------------------
 def data_normaliser(data: Union[pd.DataFrame, pd.Series, np.ndarray],
                     optical_density: float,
                     volume: float,
@@ -107,7 +106,7 @@ def data_normaliser(data: Union[pd.DataFrame, pd.Series, np.ndarray],
     return np.asarray(data, dtype=float) / denominator
 
 
-# ---- EXPERIMENT NORMALISER -----------------------------------------------------------
+# ---- experiment_normaliser -----------------------------------------------------------
 def experiment_normaliser(experiment: dict) -> dict:
     """
     ---- Summary ----
@@ -167,7 +166,7 @@ def experiment_normaliser(experiment: dict) -> dict:
     return experiment
 
 
-# ---- PERCENT CONVERTER ---------------------------------------------------------------
+# ---- percent_converter ---------------------------------------------------------------
 def percent_converter(experiment: dict,
                       source_key: str,
                       target_key: str,
@@ -223,7 +222,7 @@ def percent_converter(experiment: dict,
     return experiment
 
 
-# ---- PERCENT SCALER ------------------------------------------------------------------
+# ---- percent_scaler ------------------------------------------------------------------
 def percent_scaler(df: pd.DataFrame,
                    label: str = 'data',
                    exclude_first_minutes: float = 0.0,
@@ -287,12 +286,10 @@ def percent_scaler(df: pd.DataFrame,
     first_allowed = finite_times.min() + exclude_first_minutes
     last_allowed = finite_times.max() - exclude_last_minutes
     # Candidate windows must start after the excluded period and fit before the end.
-    allowed = (np.isfinite(times) &
-               (times >= first_allowed) &
-               (times + window_minutes <= last_allowed + 1e-12))
-    candidate_starts = (np.unique(times[allowed],
-                                  )
-                        )
+    after_start = times >= first_allowed
+    before_end = times + window_minutes <= last_allowed + 1e-12
+    allowed = np.isfinite(times) & after_start & before_end
+    candidate_starts = np.unique(times[allowed])
     if candidate_starts.size == 0:
         raise ValueError(f'{label}: no complete {window_seconds:g}-second windows '
                          f'remain after excluding the '
@@ -307,8 +304,8 @@ def percent_scaler(df: pd.DataFrame,
         values = pd.to_numeric(df[column], errors='coerce').to_numpy(dtype=float)
         lowest = highest = None
         for start in candidate_starts:
-            mask = (np.isfinite(times) & np.isfinite(values) & (times >= start) &
-                    (times <= start + window_minutes))
+            in_window = (times >= start) & (times <= start + window_minutes)
+            mask = np.isfinite(times) & np.isfinite(values) & in_window
             window_times, window_values = times[mask], values[mask]
             # Require measurements to span at least 80 % of the window.
             if (window_times.size < 2 or

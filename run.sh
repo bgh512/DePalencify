@@ -57,5 +57,5 @@ if [ ! -x ".venv_unix/bin/python" ]; then
     echo
 fi
 
-.venv_unix/bin/python DePalencify.py
+.venv_unix/bin/python main.py
 pause

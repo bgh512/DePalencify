@@ -1,5 +1,6 @@
-# -*- coding: utf-8 -*-
-"""Spectral fit loading and haem decomposition routines."""
+"""
+Spectral fit loading and haem decomposition routines.
+"""
 
 # ---- STANDARD IMPORTS ----------------------------------------------------------------
 from pathlib import Path
@@ -21,7 +22,7 @@ from utils_shared.schema import (measurement_column_finder,
 # ---- SPECTRAL DECOMPOSER HELPERS -----------------------------------------------------
 
 
-# ---- _WAVELENGTH MASKER --------------------------------------------------------------
+# ---- _wavelength_masker --------------------------------------------------------------
 def _wavelength_masker(wavelengths: np.ndarray, fit_data: pd.DataFrame) -> np.ndarray:
     """
     ---- Summary ----
@@ -59,7 +60,7 @@ def _wavelength_masker(wavelengths: np.ndarray, fit_data: pd.DataFrame) -> np.nd
 # ---- MAIN FUNCTIONS ------------------------------------------------------------------
 
 
-# ---- DATA FILTERER -------------------------------------------------------------------
+# ---- data_filterer -------------------------------------------------------------------
 def data_filterer(experimental_data: np.ndarray, fit_data: pd.DataFrame) -> np.ndarray:
     """
     ---- Summary ----
@@ -92,7 +93,7 @@ def data_filterer(experimental_data: np.ndarray, fit_data: pd.DataFrame) -> np.n
     return experimental_data[_wavelength_masker(experimental_data[:, 0], fit_data)]
 
 
-# ---- DELTA ABS CALCULATOR ------------------------------------------------------------
+# ---- delta_abs_calculator ------------------------------------------------------------
 def delta_abs_calculator(haem_abs: pd.DataFrame,
                          exclude_first_minutes: float = 5.0,
                          window_seconds: float = 30.0,
@@ -179,7 +180,7 @@ def delta_abs_calculator(haem_abs: pd.DataFrame,
     return result
 
 
-# ---- EXPERIMENT DECOMPOSER -----------------------------------------------------------
+# ---- experiment_decomposer -----------------------------------------------------------
 def experiment_decomposer(experiment: dict,
                           fit: dict,
                           dataset_name: str = 'Cyt',
@@ -305,7 +306,7 @@ def experiment_decomposer(experiment: dict,
     return experiment
 
 
-# ---- FIT IMPORTER --------------------------------------------------------------------
+# ---- fit_importer --------------------------------------------------------------------
 def fit_importer(filename: Path) -> Dict[str, Any]:
     """
     ---- Summary ----
@@ -339,7 +340,7 @@ def fit_importer(filename: Path) -> Dict[str, Any]:
     return {'haem_list': haem_names, 'data': data}
 
 
-# ---- S ARRAY GENERATOR ---------------------------------------------------------------
+# ---- s_array_generator ---------------------------------------------------------------
 def s_array_generator(experimental_data: np.ndarray,
                       fit_data: pd.DataFrame,
                       degree_of_scatter: int = 1,
@@ -399,7 +400,7 @@ def s_array_generator(experimental_data: np.ndarray,
     return s_array
 
 
-# ---- SPECTRUM DECOMPOSER -------------------------------------------------------------
+# ---- spectrum_decomposer -------------------------------------------------------------
 def spectrum_decomposer(experimental_data: np.ndarray,
                         fit_data: pd.DataFrame,
                         degree_of_scatter: int = 1,

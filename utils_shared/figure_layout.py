@@ -1,14 +1,5 @@
-# -*- coding: utf-8 -*-
 """
-Journal-aware figure sizing and automatic layout
-
-Everything here is derived from two things: the physical figure size (journal column
-width x a fraction of the page
-height) and one base font size. Margins are fitted to what is actually drawn, gaps and
-paddings are multiples of the
-font size, and panel letters sit at the top-left of each panel's real extent, so
-changing the figure size or the font
-size needs no other layout settings.
+Journal-aware figure sizing and automatic layout.
 """
 
 # ---- STANDARD IMPORTS ----------------------------------------------------------------
@@ -30,7 +21,7 @@ MM_PER_INCH = 25.4
 # ---- FIGURE LAYOUT HELPERS -----------------------------------------------------------
 
 
-# ---- _RENDERER GETTER ----------------------------------------------------------------
+# ---- _renderer_getter ----------------------------------------------------------------
 def _renderer_getter(fig: Figure) -> Any:
     """
     ---- Summary ----
@@ -66,7 +57,7 @@ def _renderer_getter(fig: Figure) -> Any:
 # ---- MAIN FUNCTIONS ------------------------------------------------------------------
 
 
-# ---- FIGURE CANVAS FITTER ------------------------------------------------------------
+# ---- figure_canvas_fitter ------------------------------------------------------------
 def figure_canvas_fitter(fig: Figure,
                          pad_pt: float,
                          suptitle: Optional[Any] = None,
@@ -159,7 +150,57 @@ def figure_canvas_fitter(fig: Figure,
         suptitle.set_in_layout(True)
 
 
-# ---- FIGURE SIZE CALCULATOR ----------------------------------------------------------
+# ---- figure_finisher -----------------------------------------------------------------
+def figure_finisher(fig: Figure,
+                    config: dict,
+                    panels: list,
+                    suptitle: Any,
+                    ) -> None:
+    """
+    ---- Summary ----
+    Helper function to fit the margins to the drawn content, add the panel letters at
+    the top-left of each panel and fit again.
+
+    ---- Inputs ----
+    fig : Figure
+        Matplotlib figure.
+    config : dict
+        Figure settings dictionary built in custom_config.py.
+    panels : list
+        List of (letter, main axes, [axes of the panel]) tuples.
+    suptitle : Any
+        Figure title text object, or None.
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    None
+        Nothing.
+
+    ---- Globals mutated ----
+    None. Resizes the layout of ``fig`` and adds text to it (side effect).
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    figure_canvas_fitter
+    panel_letter_adder
+    """
+
+    pad, gap = config['EDGE_PAD_PT'], config['TITLE_GAP_PT']
+    figure_canvas_fitter(fig, pad, suptitle, gap)
+    if config['PANEL_LETTERS'] and panels:
+        panel_letter_adder(fig,
+                           panels,
+                           config['PANEL_LETTER_FONT_SIZE'],
+                           config['PANEL_LETTER_CASE'],
+                           )
+        figure_canvas_fitter(fig, pad, suptitle, gap)
+
+
+# ---- figure_size_calculator ----------------------------------------------------------
 def figure_size_calculator(spec: dict,
                            columns: float,
                            height: float,
@@ -206,7 +247,7 @@ def figure_size_calculator(spec: dict,
     return widths[columns] / MM_PER_INCH, spec['page_height_mm'] * height / MM_PER_INCH
 
 
-# ---- FIGURE STYLE BUILDER ------------------------------------------------------------
+# ---- figure_style_builder ------------------------------------------------------------
 def figure_style_builder(spec: dict,
                          base_font_pt: float = 6.0,
                          spacing: float = 1.0,
@@ -254,28 +295,27 @@ def figure_style_builder(spec: dict,
     unit = base_font_pt * spacing
 
     # ---- 2 Build the style -----------------------------------------------------------
-    return {
-        'fonts': {'tick': base_font_pt - 1.0,
-                  'label': base_font_pt,
-                  'title': base_font_pt + 1.0,
-                  'panel_letter': spec['panel_letter_pt'],
-                  },
-        'unit': unit,                          # the padding unit in points
-        'tick_length': 0.5 * unit,
-        'tick_pad': 0.5 * unit,
-        'label_pad': 0.5 * unit,
-        'title_pad': 0.8 * unit,
-        # whitespace between the content and the edge of the figure
-        'edge_pad': 0.5 * unit,
-        'title_gap': 1.0 * unit,               # figure title to content
-        'event_label_offset': 0.8 * unit,
-        'line_width': line_width_pt,
-        'axes_line_width': round(0.65 * line_width_pt, 3),
-        'thin_line_width': round(0.5 * line_width_pt, 3),
-    }
+    return {'fonts': {'tick': base_font_pt - 1.0,
+                      'label': base_font_pt,
+                      'title': base_font_pt + 1.0,
+                      'panel_letter': spec['panel_letter_pt'],
+                      },
+            'unit': unit,                          # the padding unit in points
+            'tick_length': 0.5 * unit,
+            'tick_pad': 0.5 * unit,
+            'label_pad': 0.5 * unit,
+            'title_pad': 0.8 * unit,
+            # whitespace between the content and the edge of the figure
+            'edge_pad': 0.5 * unit,
+            'title_gap': 1.0 * unit,               # figure title to content
+            'event_label_offset': 0.8 * unit,
+            'line_width': line_width_pt,
+            'axes_line_width': round(0.65 * line_width_pt, 3),
+            'thin_line_width': round(0.5 * line_width_pt, 3),
+            }
 
 
-# ---- FIGURE STYLE CHECKER ------------------------------------------------------------
+# ---- figure_style_checker ------------------------------------------------------------
 def figure_style_checker(journal: str,
                          spec: dict,
                          fonts: dict,
@@ -339,7 +379,7 @@ def figure_style_checker(journal: str,
     return warnings
 
 
-# ---- GAP SPACE CALCULATOR ------------------------------------------------------------
+# ---- gap_space_calculator ------------------------------------------------------------
 def gap_space_calculator(gap_pt: float, extent_pt: float, n: int) -> float:
     """
     ---- Summary ----
@@ -382,7 +422,7 @@ def gap_space_calculator(gap_pt: float, extent_pt: float, n: int) -> float:
     return gap_pt * n / room
 
 
-# ---- PANEL LETTER ADDER --------------------------------------------------------------
+# ---- panel_letter_adder --------------------------------------------------------------
 def panel_letter_adder(fig: Figure,
                        panels: list,
                        font_pt: float,
@@ -494,7 +534,7 @@ def panel_letter_adder(fig: Figure,
     return artists
 
 
-# ---- STACK LEGEND DRAWER -------------------------------------------------------------
+# ---- stack_legend_drawer -------------------------------------------------------------
 def stack_legend_drawer(axes: List[Axes],
                         config: dict,
                         bottom: Optional[Axes] = None,
@@ -585,7 +625,7 @@ def stack_legend_drawer(axes: List[Axes],
     return legend
 
 
-# ---- TEXT EXTENT CALCULATOR ----------------------------------------------------------
+# ---- text_extent_calculator ----------------------------------------------------------
 def text_extent_calculator(text: str,
                            size_pt: float,
                            rotation_deg: float = 0.0,

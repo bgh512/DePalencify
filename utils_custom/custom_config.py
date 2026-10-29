@@ -1,4 +1,6 @@
-"""Settings dictionaries of the custom figures, built from the terminal answers."""
+"""
+Settings dictionaries of the custom figures, built from the terminal answers.
+"""
 
 # ---- LOCAL IMPORTS -------------------------------------------------------------------
 from config import Config, haem_colour_mapper
@@ -28,8 +30,6 @@ HAEM_AXIS_LABELS = {'raw': 'Haem concentration',
                     'delta_abs_od': 'ΔA (mOD OD$^{-1}$)',
                     }
 SAVE_FORMATS = ('svg', 'png')
-OUTPUT_SUBFOLDER = ''
-DATA_SUBFOLDER = 'triplicate_data'
 DELTA_A_OD_LABEL = '$\\Delta$A (mOD OD$^{-1}$)'
 HAEM_ABS_OD_LABEL = 'Haem absorbance (mOD OD$^{-1}$)'
 
@@ -37,7 +37,7 @@ HAEM_ABS_OD_LABEL = 'Haem absorbance (mOD OD$^{-1}$)'
 # ---- MAIN FUNCTIONS ------------------------------------------------------------------
 
 
-# ---- EXEMPLAR CONFIG BUILDER ---------------------------------------------------------
+# ---- exemplar_config_builder ---------------------------------------------------------
 def exemplar_config_builder(cfg: Config, answers: dict) -> dict:
     """
     ---- Summary ----
@@ -50,11 +50,11 @@ def exemplar_config_builder(cfg: Config, answers: dict) -> dict:
         Terminal answers; uses ho_exemplar_run, ho_ex_columns and ho_ex_height.
 
     ---- Globals read ----
-    ORDER_COLUMNS, STRAIN_ROWS, SAVE_FORMATS, OUTPUT_SUBFOLDER, DATA_SUBFOLDER.
+    ORDER_COLUMNS, STRAIN_ROWS, SAVE_FORMATS.
 
     ---- Outputs ----
     dict
-        Settings for exemplar_figure_plotter and publication_figure_saver.
+        Settings for exemplar_figure_plotter and custom_figure_saver.
 
     ---- Globals mutated ----
     None.
@@ -76,8 +76,6 @@ def exemplar_config_builder(cfg: Config, answers: dict) -> dict:
     # ---- 2 Build the configuration ---------------------------------------------------
     return {'SAVE_FIGURE': True,
             'SAVE_FORMATS': SAVE_FORMATS,
-            'OUTPUT_SUBFOLDER': OUTPUT_SUBFOLDER,
-            'DATA_SUBFOLDER': DATA_SUBFOLDER,
             'FILE_NAME': '2x2_comparison',
             'ORDER_COLUMNS': ORDER_COLUMNS,
             'STRAIN_ROWS': STRAIN_ROWS,
@@ -110,7 +108,7 @@ def exemplar_config_builder(cfg: Config, answers: dict) -> dict:
             }
 
 
-# ---- HAEM LABELLER -------------------------------------------------------------------
+# ---- haem_labeller -------------------------------------------------------------------
 def haem_labeller(haem_name: str) -> str:
     """
     ---- Summary ----
@@ -140,7 +138,7 @@ def haem_labeller(haem_name: str) -> str:
     return HAEM_LABELS.get(name_simplifier(haem_name), haem_name)
 
 
-# ---- INDIVIDUAL CONFIG BUILDER -------------------------------------------------------
+# ---- individual_config_builder -------------------------------------------------------
 def individual_config_builder(answers: dict,
                               vo2_source: str,
                               haem_source: str,
@@ -199,11 +197,14 @@ def individual_config_builder(answers: dict,
     return individual
 
 
-# ---- PUBLICATION CONFIG BUILDER ------------------------------------------------------
-def publication_config_builder(cfg: Config, answers: dict, haem_names: list) -> dict:
+# ---- ocr_and_haem_response_config_builder --------------------------------------------
+def ocr_and_haem_response_config_builder(cfg: Config,
+                                         answers: dict,
+                                         haem_names: list,
+                                         ) -> dict:
     """
     ---- Summary ----
-    Main function to build the settings of the haem and OCR publication figure.
+    Main function to build the settings of the OCR and haem response figure.
 
     ---- Inputs ----
     cfg : Config
@@ -214,12 +215,11 @@ def publication_config_builder(cfg: Config, answers: dict, haem_names: list) -> 
         Haem names of the fit, in fit order.
 
     ---- Globals read ----
-    ORDER_COLUMNS, STRAIN_ROWS, GROUP_STYLES, SAVE_FORMATS, OUTPUT_SUBFOLDER,
-    DATA_SUBFOLDER.
+    ORDER_COLUMNS, STRAIN_ROWS, GROUP_STYLES, SAVE_FORMATS.
 
     ---- Outputs ----
     dict
-        Settings for publication_figure_plotter and publication_figure_saver.
+        Settings for ocr_and_haem_response_figure_plotter and custom_figure_saver.
 
     ---- Globals mutated ----
     None.
@@ -243,9 +243,7 @@ def publication_config_builder(cfg: Config, answers: dict, haem_names: list) -> 
     rows = [{'haem': name, 'label': haem_labeller(name)} for name in haem_names]
     return ({'SAVE_FIGURE': True,
              'SAVE_FORMATS': SAVE_FORMATS,
-             'OUTPUT_SUBFOLDER': OUTPUT_SUBFOLDER,
-             'DATA_SUBFOLDER': DATA_SUBFOLDER,
-             'FILE_NAME': 'publication_figure',
+             'FILE_NAME': 'ocr_and_haem_response',
              'ORDER_COLUMNS': ORDER_COLUMNS,
              'STRAIN_ROWS': STRAIN_ROWS,
              'BLOCK_ORDER': ('baseline', 'ocr_response', 'haem_response'),
@@ -288,7 +286,7 @@ def publication_config_builder(cfg: Config, answers: dict, haem_names: list) -> 
                                                      'delta_abs': '$\\Delta$A (mOD)',
                                                      'delta_abs_od': DELTA_A_OD_LABEL,
                                                      'percent': 'Change in oxidised '
-                                                                'haem (%)',
+                                                     'haem (%)',
                                                      'default': 'Change from baseline',
                                                      },
                                            'change': 'Change from baseline (%)',
@@ -320,7 +318,7 @@ def publication_config_builder(cfg: Config, answers: dict, haem_names: list) -> 
             )
 
 
-# ---- SOURCE SELECTOR -----------------------------------------------------------------
+# ---- source_selector -----------------------------------------------------------------
 def source_selector(answers: dict, od_available: bool) -> tuple:
     """
     ---- Summary ----
@@ -365,7 +363,7 @@ def source_selector(answers: dict, od_available: bool) -> tuple:
     return vo2_source, (od_haem if use_od else raw_haem)
 
 
-# ---- TIME RESPONSE CONFIG BUILDER ----------------------------------------------------
+# ---- time_response_config_builder ----------------------------------------------------
 def time_response_config_builder(cfg: Config, answers: dict, haem_names: list,) -> dict:
     """
     ---- Summary ----
@@ -381,11 +379,11 @@ def time_response_config_builder(cfg: Config, answers: dict, haem_names: list,) 
         Haem names of the fit, used to colour the decomposition panels.
 
     ---- Globals read ----
-    SAVE_FORMATS, OUTPUT_SUBFOLDER, DATA_SUBFOLDER.
+    SAVE_FORMATS.
 
     ---- Outputs ----
     dict
-        Settings for time_response_figure_plotter, time_response_figure_saver and
+        Settings for time_response_figure_plotter, custom_figure_saver and
         time_response_exporter.
 
     ---- Globals mutated ----
@@ -401,15 +399,13 @@ def time_response_config_builder(cfg: Config, answers: dict, haem_names: list,) 
 
     # ---- 1 Read the style and size ---------------------------------------------------
     style, fonts, unit, spec = cfg.STYLE, cfg.FONTS, cfg.UNIT, cfg.SPEC
-    size = figure_size_calculator(spec, answers['tr_columns'], answers['tr_height'],)
+    size = figure_size_calculator(spec, answers['tr_columns'], answers['tr_height'])
     groups = tuple(answers['tr_groups'])
 
     # ---- 2 Build the configuration ---------------------------------------------------
     return {'SAVE_FIGURE': True,
             'SAVE_FORMATS': SAVE_FORMATS,
-            'OUTPUT_SUBFOLDER': OUTPUT_SUBFOLDER,
-            'DATA_SUBFOLDER': DATA_SUBFOLDER,
-            'FILE_NAME': 'time_response_figure',
+            'FILE_NAME': 'time_response',
             'GROUP_ORDER': groups,
             'GROUP_TITLES': {group: group.capitalize() for group in groups},
             'TIME_LABEL_FORMAT': '{hours:g} hours',

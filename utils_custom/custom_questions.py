@@ -1,5 +1,6 @@
-"""Numbered terminal questions of section 6: the time response and the haem and OCR
-response figures."""
+"""
+Numbered terminal questions of the time response and the OCR and haem response.
+"""
 
 # ---- STANDARD IMPORTS ----------------------------------------------------------------
 from pathlib import Path
@@ -26,7 +27,40 @@ from utils_shared.survey import (averaging_asker,
 # ---- CUSTOM QUESTIONS HELPERS --------------------------------------------------------
 
 
-# ---- _HAEM OCR ASKER -----------------------------------------------------------------
+# ---- _example_pair_maker -------------------------------------------------------------
+def _example_pair_maker(members: dict, name: str) -> list:
+    """
+    ---- Summary ----
+    Helper function to describe an experiment as the (group, hours) pair that is saved
+    with the answers.
+
+    ---- Inputs ----
+    members : dict
+        {experiment name: group}.
+    name : str
+        Experiment name with the hours in it, e.g. 'control_7hours'.
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    list
+        [group, hours] of the experiment.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    hours_parser
+    """
+
+    return [members[name], hours_parser(name)]
+
+
+# ---- _haem_ocr_asker -----------------------------------------------------------------
 def _haem_ocr_asker(names: List[str],
                     answers: dict,
                     defaults: dict,
@@ -154,7 +188,52 @@ def _haem_ocr_asker(names: List[str],
     return [r['name'] for r in usable]
 
 
-# ---- _TIME RESPONSE ASKER ------------------------------------------------------------
+# ---- _saved_example_finder -----------------------------------------------------------
+def _saved_example_finder(defaults: dict,
+                          key: str,
+                          members: dict,
+                          timed: list,
+                          ) -> list:
+    """
+    ---- Summary ----
+    Helper function to find the experiments that match the (group, hours) pairs
+    remembered from the last run.
+
+    ---- Inputs ----
+    defaults : dict
+        Saved answers of the last run.
+    key : str
+        Answer holding the pairs, e.g. 'tr_examples'.
+    members : dict
+        {experiment name: group}.
+    timed : list
+        Names of the experiments that have hours in their name.
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    list
+        Names of the experiments that match a saved pair, in the order of the pairs.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    hours_parser
+    """
+
+    return [name
+            for group, hours in (defaults.get(key) or [])
+            for name in timed
+            if members[name] == group and hours_parser(name) == hours
+            ]
+
+
+# ---- _time_response_asker ------------------------------------------------------------
 def _time_response_asker(names: List[str],
                          answers: dict,
                          defaults: dict,
@@ -186,6 +265,8 @@ def _time_response_asker(names: List[str],
     None.
 
     ---- Helpers ----
+    _example_pair_maker
+    _saved_example_finder
     choice_asker
     group_assigner
     hours_parser
@@ -233,18 +314,7 @@ def _time_response_asker(names: List[str],
                      )
         return None
     first_group = [n for n in timed if members[n] == groups[0]]
-
-    def _saved_names(key: str) -> list:
-        # Experiment names matching the (group, hours) pairs remembered under ``key``
-        return [n for group, hours in (defaults.get(key) or [])
-                for n in timed
-                if members[n] == group and hours_parser(n) == hours
-                ]
-
-    def _pair(name: str) -> list:
-        return [members[name], hours_parser(name)]
-
-    saved = _saved_names('tr_examples')[:2]
+    saved = _saved_example_finder(defaults, 'tr_examples', members, timed)[:2]
     top_default = saved[0] if saved else first_group[0]
     left = choice_asker('Which experiment should the first kinetic trace show?',
                         options,
@@ -262,10 +332,15 @@ def _time_response_asker(names: List[str],
                          bottom_default,
                          depth=2,
                          )
-    answers['tr_examples'] = [_pair(left), _pair(right)]
-
+    answers['tr_examples'] = [_example_pair_maker(members, left),
+                              _example_pair_maker(members, right),
+                              ]
     # The three decomposition plots are chosen separately from the kinetic traces.
-    saved = _saved_names('tr_decompositions')[:3]
+    saved = _saved_example_finder(defaults,
+                                  'tr_decompositions',
+                                  members,
+                                  timed,
+                                  )[:3]
     unused = [n for n, _ in options if n not in (left, right)]
     picks = []
     for number in range(3):
@@ -284,8 +359,9 @@ def _time_response_asker(names: List[str],
                                   depth=2,
                                   ),
                      )
-    answers['tr_decompositions'] = [_pair(name) for name in picks]
-
+    answers['tr_decompositions'] = [_example_pair_maker(members, name)
+                                    for name in picks
+                                    ]
     # Time points left out of the waterfall plots.
     skipped = text_asker('Which time points (hours) should be skipped in the waterfall '
                          'plots? Separate them with commas, or type none.',
@@ -319,7 +395,7 @@ def _time_response_asker(names: List[str],
     return members
 
 
-# ---- _WINDOW ENSURER -----------------------------------------------------------------
+# ---- _window_ensurer -----------------------------------------------------------------
 def _window_ensurer(answers: dict, defaults: dict) -> None:
     """
     ---- Summary ----
@@ -365,7 +441,7 @@ def _window_ensurer(answers: dict, defaults: dict) -> None:
 # ---- MAIN FUNCTIONS ------------------------------------------------------------------
 
 
-# ---- SUMMARY FIGURE ASKER ------------------------------------------------------------
+# ---- summary_figure_asker ------------------------------------------------------------
 def summary_figure_asker(names: List[str],
                          answers: dict,
                          defaults: dict,

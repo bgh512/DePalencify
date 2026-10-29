@@ -1,1 +1,3 @@
-"""Shared data import, processing, plotting, and export modules."""
+"""
+Shared data import, processing, plotting, and export modules.
+"""

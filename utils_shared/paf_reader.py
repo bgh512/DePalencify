@@ -1,18 +1,14 @@
-# -*- coding: utf-8 -*-
-"""Read an Espana Scientific Software .paf file directly (no bins/txt exports needed).
-
-The decoded layout (see the notes at the bottom of this file) was checked against the
-software's own exports: intensity files are
-byte-identical, transmission agrees to 1 ulp, and the .txt traces are identical.
+"""
+Direct reader of Espana Scientific Software .paf files.
 """
 
 # ---- STANDARD IMPORTS ----------------------------------------------------------------
 import bisect
 import mmap
-from pathlib import Path
 import re
 import struct
-import sys
+from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any, List, Optional, Sequence, Tuple, Union
 
 # ---- 3RD PARTY IMPORTS ---------------------------------------------------------------
@@ -36,29 +32,87 @@ LN10 = float(np.log(10.0))
 TRACE_COLUMNS = {'CsO2': 'Set O2 (uM)', 'CcO2': 'Measured O2 (uM)', 'VoO2': 'VoO2'}
 
 
-# ---- PAF ERROR -----------------------------------------------------------------------
+# ---- PafError ------------------------------------------------------------------------
 class PafError(Exception):
     """
-    The file is not a .paf, is truncated, or has a layout this reader does not know.
+    ---- Summary ----
+    Raised when the file is not a .paf, is truncated, or has a layout this reader does
+    not know.
+
+    ---- Attributes ----
+    None.
+
+    ---- Globals read ----
+    None.
+
+    ---- Methods ----
+    None.
     """
 
 
-# ---- SPECTRA -------------------------------------------------------------------------
+# ---- Spectra -------------------------------------------------------------------------
+@dataclass
 class Spectra:
-    pass
+    """
+    ---- Summary ----
+    One parsed 'Spectra: CCD' record (one spectrometer) of a .paf file.
+    Detailed structure can be found in DATA_FORMAT.md.
+    """
+
+    offset: int = 0
+    name: str = ''
+    nframes: int = 0
+    npix: int = 0
+    wl_off: Optional[int] = None
+    wavelengths: Optional[np.ndarray] = None
+    data_off: int = 0
+    data_end: int = 0
+    log: Optional[np.ndarray] = None
+    rec_end: int = 0
+    ref: Optional[np.ndarray] = None
+    params: dict = field(default_factory=dict)
+    trailer: list = field(default_factory=list)
+    checks: dict = field(default_factory=dict)
 
 
-# ---- PAF FILE ------------------------------------------------------------------------
+# ---- PafFile -------------------------------------------------------------------------
 class PafFile:
     """
+    ---- Summary ----
     An open .paf file (memory-mapped, so a 100 MB file is not read into RAM). Use ``with
-    PafFile(path) as paf:``.
+    PafFile(path) as paf:``. Everything handed out by the methods is a copy, so it stays
+    valid after the file is closed.
 
-    Everything handed out by the methods below is a copy, so it stays valid after the
-    file is closed.
+    ---- Attributes ----
+    path : Path
+        Path to the .paf file.
+    records : List[dict]
+        Record table from record_scanner (see DATA_FORMAT.md).
+    spectra : List[Spectra]
+        Parsed spectrometer records.
+    time_s : np.ndarray
+        Time of every frame in seconds, shape (n_frames,).
+
+    ---- Globals read ----
+    None.
+
+    ---- Methods ----
+    __init__
+    __enter__
+    __exit__
+    acquisition_reader
+    closer
+    dataset_name_lister
+    duration_finder
+    events_reader
+    frame_counter
+    notes_reader
+    spectra_dataset_reader
+    stream_name_lister
+    stream_reader
     """
 
-    # ---- __INIT__ --------------------------------------------------------------------
+    # ---- __init__ --------------------------------------------------------------------
     def __init__(self, path: Union[str, Path]) -> None:
         """
         ---- Summary ----
@@ -126,7 +180,9 @@ class PafFile:
                            f': {exc})',
                            )
 
-    # ---- __ENTER__ -------------------------------------------------------------------
+    # ---- SPECIAL METHODS -------------------------------------------------------------
+
+    # ---- __enter__ -------------------------------------------------------------------
     def __enter__(self) -> 'PafFile':
         """
         ---- Summary ----
@@ -154,7 +210,7 @@ class PafFile:
 
         return self
 
-    # ---- __EXIT__ --------------------------------------------------------------------
+    # ---- __exit__ --------------------------------------------------------------------
     def __exit__(self, *exc: Any) -> None:
         """
         ---- Summary ----
@@ -183,7 +239,49 @@ class PafFile:
 
         self.closer()
 
-    # ---- CLOSER ----------------------------------------------------------------------
+    # ---- MAIN METHODS ----------------------------------------------------------------
+
+    # ---- acquisition_reader ----------------------------------------------------------
+    def acquisition_reader(self) -> List[dict]:
+        """
+        ---- Summary ----
+        Main method to summarise the acquisition settings of every spectrometer.
+
+        ---- Inputs ----
+        None.
+
+        ---- Globals read ----
+        None.
+
+        ---- Outputs ----
+        List[dict]
+            One dictionary per spectrometer: dataset, spectrometer, frames, wavelengths,
+            wavelength_range_nm, the parameters read from the file, and other_fields.
+
+        ---- Globals mutated ----
+        None.
+
+        ---- Equations ----
+        None.
+
+        ---- Helpers ----
+        dataset_namer
+        """
+
+        return [{'dataset': dataset_namer(sp.name),
+                 'spectrometer': sp.name,
+                 'frames': sp.nframes,
+                 'wavelengths': sp.npix,
+                 'wavelength_range_nm': [round(float(sp.wavelengths[0]), 2),
+                                         round(float(sp.wavelengths[-1]), 2),
+                                         ],
+                 **sp.params,
+                 'other_fields': list(sp.trailer),
+                 }
+                for sp in self.spectra
+                ]
+
+    # ---- closer ----------------------------------------------------------------------
     def closer(self) -> None:
         """
         ---- Summary ----
@@ -221,14 +319,11 @@ class PafFile:
         if not self._fh.closed:
             self._fh.close()
 
-    # ---- simple facts ----------------------------------------------------------------
-
-    # ---- FRAME COUNTER ---------------------------------------------------------------
-    @property
-    def frame_counter(self) -> int:
+    # ---- dataset_name_lister ---------------------------------------------------------
+    def dataset_name_lister(self) -> List[str]:
         """
         ---- Summary ----
-        Main property to give the number of time points (frames) in the recording.
+        Main method to list the spectral datasets in the file.
 
         ---- Inputs ----
         None.
@@ -237,8 +332,8 @@ class PafFile:
         None.
 
         ---- Outputs ----
-        int
-            Length of the time base.
+        List[str]
+            Dataset names in file order.
 
         ---- Globals mutated ----
         None.
@@ -247,12 +342,12 @@ class PafFile:
         None.
 
         ---- Helpers ----
-        None.
+        dataset_namer
         """
 
-        return len(self.time_s)
+        return [dataset_namer(sp.name) for sp in self.spectra]
 
-    # ---- DURATION FINDER -------------------------------------------------------------
+    # ---- duration_finder -------------------------------------------------------------
     @property
     def duration_finder(self) -> float:
         """
@@ -281,106 +376,7 @@ class PafFile:
 
         return float(np.nanmax(self.time_s)) / 60.0
 
-    # ---- STREAM NAME LISTER ----------------------------------------------------------
-    def stream_name_lister(self) -> List[str]:
-        """
-        ---- Summary ----
-        Main method to list the traces that cover the whole recording.
-
-        ---- Inputs ----
-        None.
-
-        ---- Globals read ----
-        None.
-
-        ---- Outputs ----
-        List[str]
-            Trace names, e.g. 'CsO2', 'CcO2', 'VoO2'.
-
-        ---- Globals mutated ----
-        None.
-
-        ---- Equations ----
-        None.
-
-        ---- Helpers ----
-        None.
-        """
-
-        return list(self._main)
-
-    # ---- STREAM READER ---------------------------------------------------------------
-    def stream_reader(self, name: str) -> Optional[np.ndarray]:
-        """
-        ---- Summary ----
-        Main method to read one trace on the common time base.
-
-        ---- Inputs ----
-        name : str
-            Trace name, e.g. 'VoO2'.
-
-        ---- Globals read ----
-        None.
-
-        ---- Outputs ----
-        Optional[np.ndarray]
-            float64 array with one value per time point (NaN where the software has no
-            value, e.g. the start of VoO2), or None if the trace does not exist.
-
-        ---- Globals mutated ----
-        None.
-
-        ---- Equations ----
-        None.
-
-        ---- Helpers ----
-        None.
-        """
-
-        s = self._main.get(name)
-        if s is None:
-            return None
-        out = np.full(len(self.time_s), np.nan)
-        n = min(len(out), s['n'])
-        out[:n] = np.asarray(s['values'][:n], dtype=float)
-        return out
-
-    # ---- NOTES READER ----------------------------------------------------------------
-    def notes_reader(self) -> str:
-        """
-        ---- Summary ----
-        Main method to read the experiment notes (PaneNote record) as plain text.
-
-        ---- Inputs ----
-        None.
-
-        ---- Globals read ----
-        None.
-
-        ---- Outputs ----
-        str
-            Notes text, or an empty string if there are none.
-
-        ---- Globals mutated ----
-        None.
-
-        ---- Equations ----
-        None.
-
-        ---- Helpers ----
-        rtf_converter
-        """
-
-        for r in self.records:
-            if r['type'] == 'PaneNote':
-                m = self._mm.find(b'{\\rtf1', r['off'], r['end'])
-                if m >= 0:
-                    return rtf_converter(bytes(self._mm[m:r['end']],
-                                               ).rstrip(b'\x00 \r\n'),
-                                         )
-        return ''
-
-    # ---- EVENTS READER ---------------------------------------------------------------
+    # ---- events_reader ---------------------------------------------------------------
     def events_reader(self) -> List[dict]:
         """
         ---- Summary ----
@@ -442,11 +438,12 @@ class PafFile:
                           )
         return sorted(events, key=lambda e: e['datapoint'])
 
-    # ---- ACQUISITION READER ----------------------------------------------------------
-    def acquisition_reader(self) -> List[dict]:
+    # ---- frame_counter ---------------------------------------------------------------
+    @property
+    def frame_counter(self) -> int:
         """
         ---- Summary ----
-        Main method to summarise the acquisition settings of every spectrometer.
+        Main property to give the number of time points (frames) in the recording.
 
         ---- Inputs ----
         None.
@@ -455,9 +452,8 @@ class PafFile:
         None.
 
         ---- Outputs ----
-        List[dict]
-            One dictionary per spectrometer: dataset, spectrometer, frames, wavelengths,
-            wavelength_range_nm, the parameters read from the file, and other_fields.
+        int
+            Length of the time base.
 
         ---- Globals mutated ----
         None.
@@ -466,27 +462,16 @@ class PafFile:
         None.
 
         ---- Helpers ----
-        dataset_namer
+        None.
         """
 
-        return [{'dataset': dataset_namer(sp.name),
-                 'spectrometer': sp.name,
-                 'frames': sp.nframes,
-                 'wavelengths': sp.npix,
-                 'wavelength_range_nm': [round(float(sp.wavelengths[0]), 2),
-                                         round(float(sp.wavelengths[-1]), 2),
-                                         ],
-                 **sp.params,
-                 'other_fields': list(sp.trailer),
-                 }
-                for sp in self.spectra
-                ]
+        return len(self.time_s)
 
-    # ---- DATASET NAME LISTER ---------------------------------------------------------
-    def dataset_name_lister(self) -> List[str]:
+    # ---- notes_reader ----------------------------------------------------------------
+    def notes_reader(self) -> str:
         """
         ---- Summary ----
-        Main method to list the spectral datasets in the file.
+        Main method to read the experiment notes (PaneNote record) as plain text.
 
         ---- Inputs ----
         None.
@@ -495,8 +480,8 @@ class PafFile:
         None.
 
         ---- Outputs ----
-        List[str]
-            Dataset names in file order.
+        str
+            Notes text, or an empty string if there are none.
 
         ---- Globals mutated ----
         None.
@@ -505,12 +490,19 @@ class PafFile:
         None.
 
         ---- Helpers ----
-        dataset_namer
+        rtf_converter
         """
 
-        return [dataset_namer(sp.name) for sp in self.spectra]
+        for r in self.records:
+            if r['type'] == 'PaneNote':
+                m = self._mm.find(b'{\\rtf1', r['off'], r['end'])
+                if m >= 0:
+                    return rtf_converter(bytes(self._mm[m:r['end']],
+                                               ).rstrip(b'\x00 \r\n'),
+                                         )
+        return ''
 
-    # ---- SPECTRA DATASET READER ------------------------------------------------------
+    # ---- spectra_dataset_reader ------------------------------------------------------
     def spectra_dataset_reader(self,
                                name: str,
                                with_intensity: bool = False,
@@ -595,11 +587,75 @@ class PafFile:
             out['intensity'] = intensity
         return out
 
+    # ---- stream_name_lister ----------------------------------------------------------
+    def stream_name_lister(self) -> List[str]:
+        """
+        ---- Summary ----
+        Main method to list the traces that cover the whole recording.
+
+        ---- Inputs ----
+        None.
+
+        ---- Globals read ----
+        None.
+
+        ---- Outputs ----
+        List[str]
+            Trace names, e.g. 'CsO2', 'CcO2', 'VoO2'.
+
+        ---- Globals mutated ----
+        None.
+
+        ---- Equations ----
+        None.
+
+        ---- Helpers ----
+        None.
+        """
+
+        return list(self._main)
+
+    # ---- stream_reader ---------------------------------------------------------------
+    def stream_reader(self, name: str) -> Optional[np.ndarray]:
+        """
+        ---- Summary ----
+        Main method to read one trace on the common time base.
+
+        ---- Inputs ----
+        name : str
+            Trace name, e.g. 'VoO2'.
+
+        ---- Globals read ----
+        None.
+
+        ---- Outputs ----
+        Optional[np.ndarray]
+            float64 array with one value per time point (NaN where the software has no
+            value, e.g. the start of VoO2), or None if the trace does not exist.
+
+        ---- Globals mutated ----
+        None.
+
+        ---- Equations ----
+        None.
+
+        ---- Helpers ----
+        None.
+        """
+
+        s = self._main.get(name)
+        if s is None:
+            return None
+        out = np.full(len(self.time_s), np.nan)
+        n = min(len(out), s['n'])
+        out[:n] = np.asarray(s['values'][:n], dtype=float)
+        return out
+
 
 # ---- MAIN FUNCTIONS ------------------------------------------------------------------
 
 
-# ---- DATASET NAMER -------------------------------------------------------------------
+# ---- dataset_namer -------------------------------------------------------------------
 def dataset_namer(spectra_name: str) -> str:
     """
     ---- Summary ----
@@ -631,7 +687,7 @@ def dataset_namer(spectra_name: str) -> str:
     return DATASET_ALIAS.get(spectra_name, re.sub(r'\W+', '_', spectra_name))
 
 
-# ---- EXPERIMENT END TRIMMER ----------------------------------------------------------
+# ---- experiment_end_trimmer ----------------------------------------------------------
 def experiment_end_trimmer(experiment: dict, end_time: float) -> dict:
     """
     ---- Summary ----
@@ -723,7 +779,7 @@ def experiment_end_trimmer(experiment: dict, end_time: float) -> dict:
 #   first, template copy of each event; the second copy holds the real value).
 
 
-# ---- EXPERIMENT PAF LOADER -----------------------------------------------------------
+# ---- experiment_paf_loader -----------------------------------------------------------
 def experiment_paf_loader(path: Union[str, Path],
                           spectral_datasets: Optional[Sequence[str]] = ('Cyt',),
                           with_intensity: bool = False,
@@ -826,7 +882,7 @@ def experiment_paf_loader(path: Union[str, Path],
     return experiment
 
 
-# ---- EXPERIMENT SUMMARY READER -------------------------------------------------------
+# ---- experiment_summary_reader -------------------------------------------------------
 def experiment_summary_reader(path: Union[str, Path]) -> dict:
     """
     ---- Summary ----
@@ -880,7 +936,7 @@ def experiment_summary_reader(path: Union[str, Path]) -> dict:
                 }
 
 
-# ---- RECORD SCANNER ------------------------------------------------------------------
+# ---- record_scanner ------------------------------------------------------------------
 def record_scanner(mm: mmap.mmap) -> Tuple[List[dict], List[Spectra]]:
     """
     ---- Summary ----
@@ -942,7 +998,7 @@ def record_scanner(mm: mmap.mmap) -> Tuple[List[dict], List[Spectra]]:
     return recs, spectra
 
 
-# ---- RTF CONVERTER -------------------------------------------------------------------
+# ---- rtf_converter -------------------------------------------------------------------
 def rtf_converter(rtf: bytes) -> str:
     """
     ---- Summary ----
@@ -1029,7 +1085,7 @@ def rtf_converter(rtf: bytes) -> str:
     return '\n'.join(l.rstrip() for l in text.split('\n')).strip('\n') + '\n'
 
 
-# ---- SPECTRA PARSER ------------------------------------------------------------------
+# ---- spectra_parser ------------------------------------------------------------------
 def spectra_parser(mm: mmap.mmap, off: int, markers: List[int]) -> Spectra:
     """
     ---- Summary ----
@@ -1147,7 +1203,7 @@ def spectra_parser(mm: mmap.mmap, off: int, markers: List[int]) -> Spectra:
     return sp
 
 
-# ---- STREAM EXTRACTOR ----------------------------------------------------------------
+# ---- stream_extractor ----------------------------------------------------------------
 def stream_extractor(mm: mmap.mmap, recs: List[dict]) -> List[dict]:
     """
     ---- Summary ----
@@ -1221,7 +1277,7 @@ def stream_extractor(mm: mmap.mmap, recs: List[dict]) -> List[dict]:
     return streams
 
 
-# ---- TOKEN READER --------------------------------------------------------------------
+# ---- token_reader --------------------------------------------------------------------
 def token_reader(buf: Union[bytes, mmap.mmap],
                  start: int,
                  end: int,
@@ -1283,7 +1339,7 @@ def token_reader(buf: Union[bytes, mmap.mmap],
     return out
 
 
-# ---- U32 READER ----------------------------------------------------------------------
+# ---- u32_reader ----------------------------------------------------------------------
 def u32_reader(buf: Union[bytes, mmap.mmap], off: int) -> int:
     """
     ---- Summary ----
@@ -1315,7 +1371,7 @@ def u32_reader(buf: Union[bytes, mmap.mmap], off: int) -> int:
     return struct.unpack_from('<I', buf, off)[0]
 
 
-# ---- WARNING PRINTER -----------------------------------------------------------------
+# ---- warning_printer -----------------------------------------------------------------
 def warning_printer(msg: str) -> None:
     """
     ---- Summary ----

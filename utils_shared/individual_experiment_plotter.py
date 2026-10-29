@@ -1,30 +1,25 @@
-# -*- coding: utf-8 -*-
 """
-Plot one experiment: oxygen, VO2 and configured haem panels, with averaging windows and
-events.
+Plot of one experiment: oxygen, OCR and haem panels.
 """
 
 # ---- STANDARD IMPORTS ----------------------------------------------------------------
-from pathlib import Path
 import re
+from pathlib import Path
 from typing import Any, List, Optional, Tuple
 
 # ---- 3RD PARTY IMPORTS ---------------------------------------------------------------
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
 from matplotlib.axes import Axes
 from matplotlib.figure import Figure
 from matplotlib.gridspec import SubplotSpec
 from matplotlib.legend import Legend
-import matplotlib.pyplot as plt
 from matplotlib.ticker import MaxNLocator, ScalarFormatter
-import numpy as np
-import pandas as pd
 
 # ---- LOCAL IMPORTS -------------------------------------------------------------------
 from utils_shared.figure_layout import figure_canvas_fitter
-from utils_shared.helpers import (concentration_formatter,
-                                  figure_saver,
-                                  name_simplifier,
-                                  )
+from utils_shared.helpers import concentration_formatter, figure_saver, name_simplifier
 from utils_shared.schema import (HAEM_KEYS,
                                  measurement_column_finder,
                                  source_resolver,
@@ -34,19 +29,29 @@ from utils_shared.schema import (HAEM_KEYS,
                                  )
 
 
-# ---- _HIDE TOP TICK LABELS -----------------------------------------------------------
+# ---- _HideTopTickLabels --------------------------------------------------------------
 class _HideTopTickLabels(ScalarFormatter):
     """
+    ---- Summary ----
     A y-axis formatter that leaves out the tick label nearest the top edge when it would
-    run into the panel above
+    run into the panel above. Stacked panels touch, so a label at the very top of one
+    panel overlaps the bottom label of the panel above it; a label is dropped if its
+    tick lies within 0.7 x ``font_pt`` points (the height of a digit) of the top of the
+    axis, whatever the panel's height.
 
-    Stacked panels touch, so a label at the very top of one panel overlaps the bottom
-    label of the panel above it. A label is
-    dropped if its tick lies within 0.7 x ``font_pt`` points (the height of a digit) of
-    the top of the axis, whatever the panel's height.
+    ---- Attributes ----
+    _font_pt : float
+        Font size of the tick labels in points.
+
+    ---- Globals read ----
+    None.
+
+    ---- Methods ----
+    __init__
+    __call__
     """
 
-    # ---- __INIT__ --------------------------------------------------------------------
+    # ---- __init__ --------------------------------------------------------------------
     def __init__(self, font_pt: float) -> None:
         """
         ---- Summary ----
@@ -76,7 +81,9 @@ class _HideTopTickLabels(ScalarFormatter):
         super().__init__()
         self._font_pt = font_pt
 
-    # ---- __CALL__ --------------------------------------------------------------------
+    # ---- SPECIAL METHODS -------------------------------------------------------------
+
+    # ---- __call__ --------------------------------------------------------------------
     def __call__(self, x: float, pos: Optional[int] = None) -> str:
         """
         ---- Summary ----
@@ -121,7 +128,7 @@ class _HideTopTickLabels(ScalarFormatter):
 # ---- INDIVIDUAL EXPERIMENT PLOTTER HELPERS -------------------------------------------
 
 
-# ---- _AXES LEGEND DRAWER -------------------------------------------------------------
+# ---- _axes_legend_drawer -------------------------------------------------------------
 def _axes_legend_drawer(ax: Axes,
                         config: dict,
                         text_only: bool = False,
@@ -180,7 +187,7 @@ def _axes_legend_drawer(ax: Axes,
     return legend
 
 
-# ---- _FIRST SERIES GETTER ------------------------------------------------------------
+# ---- _first_series_getter ------------------------------------------------------------
 def _first_series_getter(df: pd.DataFrame) -> Tuple[np.ndarray, np.ndarray]:
     """
     ---- Summary ----
@@ -214,7 +221,7 @@ def _first_series_getter(df: pd.DataFrame) -> Tuple[np.ndarray, np.ndarray]:
     return time_getter(df), value_getter(df, column)
 
 
-# ---- _HAEM DATA SELECTOR -------------------------------------------------------------
+# ---- _haem_data_selector -------------------------------------------------------------
 def _haem_data_selector(experiment: dict,
                         config: dict,
                         ) -> Tuple[Optional[pd.DataFrame], Optional[str]]:
@@ -263,7 +270,7 @@ def _haem_data_selector(experiment: dict,
     return haem_data, source
 
 
-# ---- _HEIGHT RATIO CALCULATOR --------------------------------------------------------
+# ---- _height_ratio_calculator --------------------------------------------------------
 def _height_ratio_calculator(panels: List[dict], config: dict) -> List[float]:
     """
     ---- Summary ----
@@ -317,7 +324,7 @@ def _height_ratio_calculator(panels: List[dict], config: dict) -> List[float]:
     return ratios
 
 
-# ---- _MIN TICKS SETTER ---------------------------------------------------------------
+# ---- _min_ticks_setter ---------------------------------------------------------------
 def _min_ticks_setter(axis: Any, count: Optional[int]) -> None:
     """
     ---- Summary ----
@@ -351,7 +358,7 @@ def _min_ticks_setter(axis: Any, count: Optional[int]) -> None:
         axis.set_major_locator(MaxNLocator(nbins=count - 1, min_n_ticks=count))
 
 
-# ---- _PANEL BUILDER ------------------------------------------------------------------
+# ---- _panel_builder ------------------------------------------------------------------
 def _panel_builder(experiment: dict,
                    config: dict,
                    haem_data: Optional[pd.DataFrame],
@@ -425,7 +432,7 @@ def _panel_builder(experiment: dict,
     return panels
 
 
-# ---- _VO2 YMAX CALCULATOR ------------------------------------------------------------
+# ---- _vo2_ymax_calculator ------------------------------------------------------------
 def _vo2_ymax_calculator(y: np.ndarray,
                          window_fraction: float,
                          headroom: float,
@@ -477,7 +484,7 @@ def _vo2_ymax_calculator(y: np.ndarray,
     return top + noise + headroom * max(top, 0.0)
 
 
-# ---- _WINDOW DRAWER ------------------------------------------------------------------
+# ---- _window_drawer ------------------------------------------------------------------
 def _window_drawer(axes: List[Axes], experiment: dict, config: dict) -> None:
     """
     ---- Summary ----
@@ -542,7 +549,7 @@ def _window_drawer(axes: List[Axes], experiment: dict, config: dict) -> None:
                          )
 
 
-# ---- _WINDOW LABEL BUILDER -----------------------------------------------------------
+# ---- _window_label_builder -----------------------------------------------------------
 def _window_label_builder(window_name: str, config: dict) -> str:
     """
     ---- Summary ----
@@ -579,7 +586,7 @@ def _window_label_builder(window_name: str, config: dict) -> str:
     return config['AVERAGING_WINDOW_LABEL_FORMAT'].format(n=number, name=window_name)
 
 
-# ---- _YLIM CALCULATOR ----------------------------------------------------------------
+# ---- _ylim_calculator ----------------------------------------------------------------
 def _ylim_calculator(times: np.ndarray,
                      series: List[np.ndarray],
                      ignore_minutes: float,
@@ -635,7 +642,7 @@ def _ylim_calculator(times: np.ndarray,
 # ---- MAIN FUNCTIONS ------------------------------------------------------------------
 
 
-# ---- EXPERIMENT DRAWER ---------------------------------------------------------------
+# ---- experiment_drawer ---------------------------------------------------------------
 def experiment_drawer(fig: Figure,
                       subplot_spec: SubplotSpec,
                       experiment: dict,
@@ -679,8 +686,10 @@ def experiment_drawer(fig: Figure,
     _height_ratio_calculator
     _min_ticks_setter
     _panel_builder
+    _vo2_ymax_calculator
     _window_drawer
     _ylim_calculator
+    concentration_formatter
     name_simplifier
     source_resolver
     time_getter
@@ -803,17 +812,13 @@ def experiment_drawer(fig: Figure,
             if config['HAEM_Y_MIN'] is not None or config['HAEM_Y_MAX'] is not None:
                 ax.set_ylim(config['HAEM_Y_MIN'], config['HAEM_Y_MAX'])
             else:
-                limits = (_ylim_calculator(t,
-                                           [value_getter(haem_data, h)
-                                            for h in panel['haems']
-                                            ],
-                                           config['Y_SCALE_IGNORE_FIRST_MINUTES'],
-                                           ignore_last_minutes=config.get(
-                                               'Y_SCALE_IGNORE_LAST_MINUTES',
-                                               0.0,
-                                           ),
-                                           )
-                          )
+                haem_values = [value_getter(haem_data, h) for h in panel['haems']]
+                ignore_last = config.get('Y_SCALE_IGNORE_LAST_MINUTES', 0.0)
+                limits = _ylim_calculator(t,
+                                          haem_values,
+                                          config['Y_SCALE_IGNORE_FIRST_MINUTES'],
+                                          ignore_last_minutes=ignore_last,
+                                          )
                 if limits:
                     ax.set_ylim(*limits)
         if config['SHOW_LEGENDS'].get(panel['type'], True):
@@ -947,7 +952,7 @@ def experiment_drawer(fig: Figure,
     return axes, panels
 
 
-# ---- EXPERIMENT PLOTTER --------------------------------------------------------------
+# ---- experiment_plotter --------------------------------------------------------------
 def experiment_plotter(experiment: dict,
                        config: dict,
                        export_root: Path,
@@ -1060,7 +1065,7 @@ def experiment_plotter(experiment: dict,
     return fig, axes
 
 
-# ---- EXPERIMENT TITLE BUILDER --------------------------------------------------------
+# ---- experiment_title_builder --------------------------------------------------------
 def experiment_title_builder(experiment: dict, config: dict) -> str:
     """
     ---- Summary ----
@@ -1093,7 +1098,7 @@ def experiment_title_builder(experiment: dict, config: dict) -> str:
     return config['FIGURE_TITLE'].format(experiment_name=experiment['experiment_name'])
 
 
-# ---- WATERMARK STYLE BUILDER ---------------------------------------------------------
+# ---- watermark_style_builder ---------------------------------------------------------
 def watermark_style_builder(config: dict) -> dict:
     """
     ---- Summary ----

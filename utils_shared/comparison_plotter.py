@@ -1,7 +1,5 @@
-# -*- coding: utf-8 -*-
 """
-Two experiments side by side in one figure, each with its own y axes, panel letters (a,
-b) and white space between them.
+Two experiments side by side in one figure.
 """
 
 # ---- STANDARD IMPORTS ----------------------------------------------------------------
@@ -9,9 +7,9 @@ from pathlib import Path
 from typing import Any, List, Tuple
 
 # ---- 3RD PARTY IMPORTS ---------------------------------------------------------------
+import matplotlib.pyplot as plt
 from matplotlib.axes import Axes
 from matplotlib.figure import Figure
-import matplotlib.pyplot as plt
 
 # ---- LOCAL IMPORTS -------------------------------------------------------------------
 from utils_shared.figure_layout import (figure_canvas_fitter,
@@ -33,7 +31,7 @@ GAP_EXTRA_PT_PER_PAD = 8
 # ---- COMPARISON PLOTTER HELPERS ------------------------------------------------------
 
 
-# ---- _OVERHANG CALCULATOR ------------------------------------------------------------
+# ---- _overhang_calculator ------------------------------------------------------------
 def _overhang_calculator(fig: Figure,
                          members: List[Axes],
                          main: Axes,
@@ -76,7 +74,7 @@ def _overhang_calculator(fig: Figure,
             ) * scale, (max(b.x1 for b in boxes) - box.x1) * scale
 
 
-# ---- _RENDERER GETTER ----------------------------------------------------------------
+# ---- _renderer_getter ----------------------------------------------------------------
 def _renderer_getter(fig: Figure) -> Any:
     """
     ---- Summary ----
@@ -112,7 +110,7 @@ def _renderer_getter(fig: Figure) -> Any:
 # ---- MAIN FUNCTIONS ------------------------------------------------------------------
 
 
-# ---- COMPARISON FIGURE PLOTTER -------------------------------------------------------
+# ---- comparison_figure_plotter -------------------------------------------------------
 def comparison_figure_plotter(first: dict,
                               second: dict,
                               config: dict,

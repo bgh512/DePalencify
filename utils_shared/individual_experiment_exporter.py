@@ -1,7 +1,5 @@
-# -*- coding: utf-8 -*-
 """
-Export one processed experiment to an Excel workbook (optionally with spectral CSV
-files), and read the saved settings back.
+Export of one processed experiment to an Excel workbook.
 """
 
 # ---- STANDARD IMPORTS ----------------------------------------------------------------
@@ -53,7 +51,90 @@ SETTINGS_KEYS = ('OD', 'volume', 'dilution_factor')
 # ---- INDIVIDUAL EXPERIMENT EXPORTER HELPERS ------------------------------------------
 
 
-# ---- _SPECTRAL CSV EXPORTER ----------------------------------------------------------
+# ---- _frame_writer -------------------------------------------------------------------
+def _frame_writer(sheets: tuple,
+                  frame: pd.DataFrame,
+                  sheet_title: str,
+                  first_col_width: float = 18,
+                  ) -> Any:
+    """
+    ---- Summary ----
+    Helper function to write a DataFrame as a formatted worksheet.
+
+    ---- Inputs ----
+    sheets : tuple
+        (open ExcelWriter, header format, set of sheet names already used).
+    frame : pd.DataFrame
+        Data to write.
+    sheet_title : str
+        Wanted sheet name; made unique and valid for Excel.
+    first_col_width : float
+        Width of the first column.
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    Any
+        The xlsxwriter worksheet.
+
+    ---- Globals mutated ----
+    None. Adds a sheet to the open workbook and records its name (side effect).
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    excel_sheet_namer
+    """
+
+    writer, header_format, used_sheets = sheets
+    sheet = excel_sheet_namer(sheet_title, used_sheets)
+    frame.to_excel(writer, sheet_name=sheet, index=False)
+    worksheet = writer.sheets[sheet]
+    for col, column_name in enumerate(frame.columns):
+        worksheet.write(0, col, str(column_name), header_format)
+    worksheet.set_row(0, 32)
+    worksheet.set_column(0, 0, first_col_width)
+    worksheet.set_column(1, max(len(frame.columns), 2), 16)
+    worksheet.freeze_panes(1, 0)
+    return worksheet
+
+
+# ---- _name_lister --------------------------------------------------------------------
+def _name_lister(windows: dict, kind: str) -> List[str]:
+    """
+    ---- Summary ----
+    Helper function to list the measurement names of one kind (vo2 or haem) over all
+    windows, in first-seen order.
+
+    ---- Inputs ----
+    windows : dict
+        Window name -> window record, each holding 'vo2' and 'haem' dicts.
+    kind : str
+        'vo2' or 'haem'.
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    List[str]
+        Unique measurement names.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    None.
+    """
+
+    return list(dict.fromkeys(m for w in windows.values() for m in w[kind]))
+
+
+# ---- _spectral_csv_exporter ----------------------------------------------------------
 def _spectral_csv_exporter(experiment: dict, folder: Path) -> List[dict]:
     """
     ---- Summary ----
@@ -125,7 +206,7 @@ def _spectral_csv_exporter(experiment: dict, folder: Path) -> List[dict]:
 # ---- MAIN FUNCTIONS ------------------------------------------------------------------
 
 
-# ---- AVERAGES TABLE BUILDER ----------------------------------------------------------
+# ---- averages_table_builder ----------------------------------------------------------
 def averages_table_builder(averages: dict) -> pd.DataFrame:
     """
     ---- Summary ----
@@ -158,35 +239,7 @@ def averages_table_builder(averages: dict) -> pd.DataFrame:
 
     # ---- 1 Get the measurement names -------------------------------------------------
     windows = averages['windows']
-    def _name_lister(kind: str) -> List[str]:
-        """
-        ---- Summary ----
-        Helper function to list the measurement names of one kind (vo2 or haem) over all
-        windows, in first-seen order.
-
-        ---- Inputs ----
-        kind : str
-            'vo2' or 'haem'.
-
-        ---- Globals read ----
-        None.
-
-        ---- Outputs ----
-        List[str]
-            Unique measurement names.
-
-        ---- Globals mutated ----
-        None.
-
-        ---- Equations ----
-        None.
-
-        ---- Helpers ----
-        None.
-        """
-
-        return list(dict.fromkeys(m for w in windows.values() for m in w[kind]))
-    vo2_names, haem_names = _name_lister('vo2'), _name_lister('haem')
+    vo2_names, haem_names = _name_lister(windows, 'vo2'), _name_lister(windows, 'haem')
 
     # ---- 2 Define the column groups --------------------------------------------------
     groups = [('vo2', m, 'VoO2' if len(vo2_names) == 1 else f'VoO2 ({m})')
@@ -210,7 +263,7 @@ def averages_table_builder(averages: dict) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
-# ---- EXPERIMENT WORKBOOK EXPORTER ----------------------------------------------------
+# ---- experiment_workbook_exporter ----------------------------------------------------
 def experiment_workbook_exporter(experiment: dict,
                                  output_dir: Path,
                                  full: bool = False,
@@ -250,7 +303,6 @@ def experiment_workbook_exporter(experiment: dict,
     _frame_writer
     _spectral_csv_exporter
     averages_table_builder
-    excel_sheet_namer
     file_name_sanitiser
     """
 
@@ -273,52 +325,10 @@ def experiment_workbook_exporter(experiment: dict,
                                              },
                                             )
         link_format = workbook.add_format({'font_color': 'blue', 'underline': 1})
-        def _frame_writer(frame: pd.DataFrame,
-                          sheet_title: str,
-                          first_col_width: float = 18,
-                          ) -> Any:
-            """
-            ---- Summary ----
-            Helper function to write a DataFrame as a formatted worksheet.
-
-            ---- Inputs ----
-            frame : pd.DataFrame
-                Data to write.
-            sheet_title : str
-                Wanted sheet name; made unique and valid for Excel.
-            first_col_width : float
-                Width of the first column.
-
-            ---- Globals read ----
-            None.
-
-            ---- Outputs ----
-            Any
-                The xlsxwriter worksheet.
-
-            ---- Globals mutated ----
-            None. Adds a sheet to the open workbook and records its name (side effect).
-
-            ---- Equations ----
-            None.
-
-            ---- Helpers ----
-            excel_sheet_namer
-            """
-
-            sheet = excel_sheet_namer(sheet_title, used_sheets)
-            frame.to_excel(writer, sheet_name=sheet, index=False)
-            worksheet = writer.sheets[sheet]
-            for col, column_name in enumerate(frame.columns):
-                worksheet.write(0, col, str(column_name), header_format)
-            worksheet.set_row(0, 32)
-            worksheet.set_column(0, 0, first_col_width)
-            worksheet.set_column(1, max(len(frame.columns), 2), 16)
-            worksheet.freeze_panes(1, 0)
-            return worksheet
+        sheets = (writer, header_format, used_sheets)
         # 1. Spectral data index (links to the CSVs).
         if spectral_records:
-            worksheet = _frame_writer(pd.DataFrame(spectral_records),
+            worksheet = _frame_writer(sheets, pd.DataFrame(spectral_records),
                                       'Spectral data',
                                       first_col_width=14,
                                       )
@@ -334,12 +344,12 @@ def experiment_workbook_exporter(experiment: dict,
         for key, sheet_title in sheet_keys:
             frame = experiment.get(key)
             if isinstance(frame, pd.DataFrame) and not frame.empty:
-                _frame_writer(frame, sheet_title)
+                _frame_writer(sheets, frame, sheet_title)
         # 3. Event-window averages.
         averages = experiment.get('averages')
         if averages and averages.get('windows'):
             table = averages_table_builder(averages)
-            worksheet = _frame_writer(table, 'Averages', first_col_width=14)
+            worksheet = _frame_writer(sheets, table, 'Averages', first_col_width=14)
             settings = averages['settings']
             used = [f'{label} source: {key}'
                     for label, key in (('VoO2', settings.get('vo2_key')),
@@ -362,38 +372,33 @@ def experiment_workbook_exporter(experiment: dict,
                              )
             for offset, note in enumerate(notes, start=2):
                 worksheet.write(len(table) + offset, 0, note)
-        metadata = (experiment.get('metadata')
-                    if isinstance(experiment.get('metadata'), dict)
-                    else {}
-                    )
+        metadata = experiment.get('metadata')
+        if not isinstance(metadata, dict):
+            metadata = {}
         # 4. Events, with the label and concentration the user entered.
         all_events = (list(metadata.get('events', [])) +
-                      list(metadata.get('ignored_events', [])))
-        events = (sorted(all_events,
-                         key=lambda e: e.get('time',
-                                             ) if e.get('time') is not None else 0,
-                         )
-                  )
-        if True:  # always written, so the sheet exists even for a file with no events
-            _frame_writer(pd.DataFrame({'event': [f'Event {i}'
-                                                  for i in range(1, len(events) + 1)
-                                                  ],
-                                        'datapoint': [e.get('datapoint') for e in events
-                                                      ],
-                                        'time_min': [e.get('time') for e in events],
-                                        'paf_text': [e.get('text', '') for e in events],
-                                        'label': [e.get('label', '') for e in events],
-                                        'concentration_uM': [e.get('concentration_uM')
-                                                             for e in events
-                                                             ],
-                                        'ignored': [bool(e.get('ignored', False))
-                                                    for e in events
-                                                    ],
-                                        },
-                                       ),
-                          'Events',
-                          first_col_width=12,
-                          )
+                      list(metadata.get('ignored_events', []))
+                      )
+        events = sorted(all_events,
+                        key=lambda e: e.get('time') if e.get('time') is not None else 0,
+                        )
+        # always written, so the sheet exists even for a file with no events
+        event_frame = pd.DataFrame({'event': [f'Event {i}'
+                                              for i in range(1, len(events) + 1)
+                                              ],
+                                    'datapoint': [e.get('datapoint') for e in events],
+                                    'time_min': [e.get('time') for e in events],
+                                    'paf_text': [e.get('text', '') for e in events],
+                                    'label': [e.get('label', '') for e in events],
+                                    'concentration_uM': [e.get('concentration_uM')
+                                                         for e in events
+                                                         ],
+                                    'ignored': [bool(e.get('ignored', False))
+                                                for e in events
+                                                ],
+                                    },
+                                   )
+        _frame_writer(sheets, event_frame, 'Events', first_col_width=12)
         # 5. Metadata (OD, volume, dilution factor, settings used, notes, acquisition
         # details).
         fields = [(k, v)
@@ -408,7 +413,7 @@ def experiment_workbook_exporter(experiment: dict,
                                         ],
                               },
                              )
-        worksheet = _frame_writer(frame, 'Metadata', first_col_width=24)
+        worksheet = _frame_writer(sheets, frame, 'Metadata', first_col_width=24)
         worksheet.set_column(1, 1, 90)
 
     # ---- 3 Report the export ---------------------------------------------------------
@@ -416,7 +421,7 @@ def experiment_workbook_exporter(experiment: dict,
     return output_path
 
 
-# ---- SAVED SETTINGS READER -----------------------------------------------------------
+# ---- saved_settings_reader -----------------------------------------------------------
 def saved_settings_reader(output_dir: Path, experiment_name: str) -> Optional[dict]:
     """
     ---- Summary ----
@@ -490,7 +495,7 @@ def saved_settings_reader(output_dir: Path, experiment_name: str) -> Optional[di
     return saved if any(k in saved for k in SETTINGS_KEYS) or events else None
 
 
-# ---- WORKBOOK PATH BUILDER -----------------------------------------------------------
+# ---- workbook_path_builder -----------------------------------------------------------
 def workbook_path_builder(output_dir: Path, experiment_name: str) -> Path:
     """
     ---- Summary ----

@@ -1,4 +1,6 @@
-"""Event-window spectral averages, their difference spectrum and its decomposition."""
+"""
+Event-window spectral averages, their difference spectrum and its decomposition.
+"""
 
 # ---- STANDARD IMPORTS ----------------------------------------------------------------
 from typing import Iterable, Optional
@@ -13,7 +15,7 @@ from utils_shared.spectral_decomposer import spectrum_decomposer
 # ---- MAIN FUNCTIONS ------------------------------------------------------------------
 
 
-# ---- DIFFERENCE SPECTRUM CALCULATOR --------------------------------------------------
+# ---- difference_spectrum_calculator --------------------------------------------------
 def difference_spectrum_calculator(experiment: dict,
                                    minuend: str = 'penultimate',
                                    subtrahend: str = 'final',
@@ -77,7 +79,7 @@ def difference_spectrum_calculator(experiment: dict,
     return experiment
 
 
-# ---- DIFFERENCE SPECTRUM DECOMPOSER --------------------------------------------------
+# ---- difference_spectrum_decomposer --------------------------------------------------
 def difference_spectrum_decomposer(experiment: dict,
                                    fit: dict,
                                    degree_of_scatter: int = 1,
@@ -174,7 +176,7 @@ def difference_spectrum_decomposer(experiment: dict,
     return experiment
 
 
-# ---- SPECTRAL AVERAGER ---------------------------------------------------------------
+# ---- spectral_averager ---------------------------------------------------------------
 def spectral_averager(experiment: dict,
                       dataset_name: str,
                       spectrum_type: str,
@@ -300,7 +302,7 @@ def spectral_averager(experiment: dict,
     return experiment
 
 
-# ---- WINDOW DEFINER ------------------------------------------------------------------
+# ---- window_definer ------------------------------------------------------------------
 def window_definer(event_times: Iterable,
                    recording_end: float,
                    window_minutes: float,

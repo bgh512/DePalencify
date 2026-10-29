@@ -59,7 +59,7 @@ if not exist ".venv\Scripts\python.exe" (
     echo.
 )
 
-".venv\Scripts\python.exe" DePalencify.py
+".venv\Scripts\python.exe" main.py
 echo.
 pause
 exit /b 0

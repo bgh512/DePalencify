@@ -1,29 +1,5 @@
-# -*- coding: utf-8 -*-
-"""Names and conventions that define the experiment data model.
-
-Every time-resolved DataFrame stored in an experiment dictionary carries its own
-``TIME_COLUMN`` (minutes), so downstream code reads ``df[TIME_COLUMN]`` directly
-and never has to search for a time column.
-
-Experiment dictionary keys
---------------------------
-experiment_name      str
-metadata             dict (OD, volume, dilution_factor, events, ...)
-CcO2, CsO2, VoO2     DataFrames: TIME_COLUMN + measurement column(s)
-raw_spectra          {dataset: {wavelengths, spectrum_indices, time,
-                                transmission, intensity, attenuation}}
-VoO2_OD              OD-normalised VoO2           (optional)
-VoO2_percent         VoO2 scaled to 0-100 %       (optional)
-haem_conc            DataFrame: TIME_COLUMN, SPECTRUM_INDEX_COLUMN, haems (optional)
-haem_abs             haem absorbance contribution in mOD (concentration x peak of the
-fit spectrum; optional)
-haem_delta_abs       haem_abs shifted additively so the mean of its first window (after
-an excluded start) is 0 (optional)
-haem_OD              OD-normalised haem_conc      (optional)
-haem_abs_OD          OD-normalised haem_abs       (optional)
-haem_delta_abs_OD    OD-normalised haem_delta_abs (optional)
-haem_percent         haem_conc scaled to 0-100 %  (optional)
-averages             event-window statistics      (optional)
+"""
+Names and conventions of the experiment data model.
 """
 
 # ---- STANDARD IMPORTS ----------------------------------------------------------------
@@ -55,7 +31,7 @@ DELTA_HAEM_SOURCES = ('delta_abs', 'delta_abs_od')
 # ---- MAIN FUNCTIONS ------------------------------------------------------------------
 
 
-# ---- FINITE FLOAT CONVERTER ----------------------------------------------------------
+# ---- finite_float_converter ----------------------------------------------------------
 def finite_float_converter(value: Any) -> float:
     """
     ---- Summary ----
@@ -90,7 +66,7 @@ def finite_float_converter(value: Any) -> float:
     return value if np.isfinite(value) else np.nan
 
 
-# ---- MEASUREMENT COLUMN FINDER -------------------------------------------------------
+# ---- measurement_column_finder -------------------------------------------------------
 def measurement_column_finder(df: pd.DataFrame) -> List[str]:
     """
     ---- Summary ----
@@ -120,7 +96,7 @@ def measurement_column_finder(df: pd.DataFrame) -> List[str]:
     return [c for c in df.columns if c not in (TIME_COLUMN, SPECTRUM_INDEX_COLUMN)]
 
 
-# ---- SOURCE RESOLVER -----------------------------------------------------------------
+# ---- source_resolver -----------------------------------------------------------------
 def source_resolver(experiment: dict,
                     source: str,
                     keys: Dict[str, str],
@@ -175,7 +151,7 @@ def source_resolver(experiment: dict,
     return key, df
 
 
-# ---- TIME GETTER ---------------------------------------------------------------------
+# ---- time_getter ---------------------------------------------------------------------
 def time_getter(df: pd.DataFrame) -> np.ndarray:
     """
     ---- Summary ----
@@ -210,7 +186,7 @@ def time_getter(df: pd.DataFrame) -> np.ndarray:
     return pd.to_numeric(df[TIME_COLUMN], errors='coerce').to_numpy(dtype=float)
 
 
-# ---- VALUE GETTER --------------------------------------------------------------------
+# ---- value_getter --------------------------------------------------------------------
 def value_getter(df: pd.DataFrame, column: str) -> np.ndarray:
     """
     ---- Summary ----

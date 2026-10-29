@@ -1,4 +1,6 @@
-"""Across-run (triplicate) statistics of the event-window averages."""
+"""
+Across-run (triplicate) statistics of the event-window averages.
+"""
 
 # ---- STANDARD IMPORTS ----------------------------------------------------------------
 from typing import Iterable
@@ -13,7 +15,7 @@ from utils_custom.run_namer import condition_grouper
 # ---- TRIPLICATE AVERAGER HELPERS -----------------------------------------------------
 
 
-# ---- _RUN SUMMARISER -----------------------------------------------------------------
+# ---- _run_summariser -----------------------------------------------------------------
 def _run_summariser(values: Iterable) -> tuple:
     """
     ---- Summary ----
@@ -53,7 +55,54 @@ def _run_summariser(values: Iterable) -> tuple:
     return mean, sd, sd / np.sqrt(n), n
 
 
-# ---- _WINDOW SORTER ------------------------------------------------------------------
+# ---- _run_value_getter ---------------------------------------------------------------
+def _run_value_getter(windows_by_run: dict,
+                      window_name: str,
+                      kind: str,
+                      measurement: str,
+                      field: str,
+                      ) -> dict:
+    """
+    ---- Summary ----
+    Helper function to read one statistic of one window and measurement for every run.
+
+    ---- Inputs ----
+    windows_by_run : dict
+        {run number: {window name: window record}} from the runs' averages.
+    window_name : str
+        Window name such as 'average3'.
+    kind : str
+        'vo2' or 'haem'.
+    measurement : str
+        Measurement (column) name.
+    field : str
+        Statistic name: 'mean', 'sd', 'change' or 'delta'.
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    dict
+        {run number: value}, NaN where a run lacks the window.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    None.
+    """
+
+    return {run: windows[window_name][kind].get(measurement, {}).get(field, np.nan)
+            if window_name in windows
+            else np.nan
+            for run, windows in windows_by_run.items()
+            }
+
+
+# ---- _window_sorter ------------------------------------------------------------------
 def _window_sorter(window_name: str) -> int:
     """
     ---- Summary ----
@@ -86,7 +135,7 @@ def _window_sorter(window_name: str) -> int:
 # ---- MAIN FUNCTIONS ------------------------------------------------------------------
 
 
-# ---- TRIPLICATE AVERAGER -------------------------------------------------------------
+# ---- triplicate_averager -------------------------------------------------------------
 def triplicate_averager(experiments: dict, min_runs: int = 2) -> dict:
     """
     ---- Summary ----
@@ -167,45 +216,16 @@ def triplicate_averager(experiments: dict, min_runs: int = 2) -> dict:
             for measurement in measurements:
                 result[kind][measurement] = {}
                 for window_name in window_names:
-                    def _run_value_getter(field: str) -> dict:
-                        """
-                        ---- Summary ----
-                        Helper function to read one statistic of the current window for
-                        every run.
-
-                        ---- Inputs ----
-                        field : str
-                            Statistic name: 'mean', 'sd', 'change' or 'delta'.
-
-                        ---- Globals read ----
-                        None.
-
-                        ---- Outputs ----
-                        dict
-                            {run number: value}, NaN where a run lacks the window.
-
-                        ---- Globals mutated ----
-                        None.
-
-                        ---- Equations ----
-                        None.
-
-                        ---- Helpers ----
-                        None.
-                        """
-
-                        return {run: windows[window_name][kind].get(measurement,
-                                                                    {},
-                                                                    ).get(field, np.nan)
-                                if window_name in windows
-                                else np.nan
-                                for run, windows in windows_by_run.items()
-                                }
-                    run_means, run_sds, run_changes = (_run_value_getter('mean'),
-                                                       _run_value_getter('sd'),
-                                                       _run_value_getter('change'),
+                    values = {field: _run_value_getter(windows_by_run,
+                                                       window_name,
+                                                       kind,
+                                                       measurement,
+                                                       field,
                                                        )
-                    run_deltas = _run_value_getter('delta')
+                              for field in ('mean', 'sd', 'change', 'delta')
+                              }
+                    run_means, run_sds = values['mean'], values['sd']
+                    run_changes, run_deltas = values['change'], values['delta']
                     mean, sd, sem, n = _run_summariser(run_means.values())
                     c_mean, c_sd, c_sem, c_n = _run_summariser(run_changes.values())
                     d_mean, d_sd, d_sem, d_n = _run_summariser(run_deltas.values())

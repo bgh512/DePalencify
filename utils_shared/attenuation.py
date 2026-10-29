@@ -1,5 +1,6 @@
-# -*- coding: utf-8 -*-
-"""Convert transmission spectra to the attenuation spectra used for decomposition."""
+"""
+Convert transmission spectra to the attenuation spectra used for decomposition.
+"""
 
 # ---- STANDARD IMPORTS ----------------------------------------------------------------
 from typing import Optional, Sequence, Union
@@ -11,7 +12,7 @@ import numpy as np
 # ---- MAIN FUNCTIONS ------------------------------------------------------------------
 
 
-# ---- ATTENUATION CONVERTER -----------------------------------------------------------
+# ---- attenuation_converter -----------------------------------------------------------
 def attenuation_converter(transmission: Union[Sequence[float], np.ndarray],
                           mode: str = 'fraction',
                           ) -> np.ndarray:
@@ -69,7 +70,7 @@ def attenuation_converter(transmission: Union[Sequence[float], np.ndarray],
     return attenuation
 
 
-# ---- EXPERIMENT ATTENUATION ADDER ----------------------------------------------------
+# ---- experiment_attenuation_adder ----------------------------------------------------
 def experiment_attenuation_adder(experiment: dict,
                                  mode: str = 'fraction',
                                  datasets: Optional[Sequence[str]] = None,

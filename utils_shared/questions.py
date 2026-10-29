@@ -1,10 +1,5 @@
-"""Small helpers for asking numbered questions in the terminal.
-
-Every question is printed on its own line, in colour, with a number (1.1, 1.1.1, ...)
-and
-its default in [brackets]; the answer is typed on the next line and Enter accepts the
-default.
-Information lines are printed normally, so the questions stand out.
+"""
+Helpers for asking numbered questions in the terminal.
 """
 
 # ---- STANDARD IMPORTS ----------------------------------------------------------------
@@ -26,18 +21,28 @@ _colour_ready = False
 _tight_next = False  # True: the next question follows its heading line directly
 
 
-# ---- USER QUIT -----------------------------------------------------------------------
+# ---- UserQuit ------------------------------------------------------------------------
 class UserQuit(Exception):
     """
+    ---- Summary ----
     Raised when the input ends (window closed, Ctrl+Z / Ctrl+D) so the program can stop
     cleanly.
+
+    ---- Attributes ----
+    None.
+
+    ---- Globals read ----
+    None.
+
+    ---- Methods ----
+    None.
     """
 
 
 # ---- QUESTIONS HELPERS ---------------------------------------------------------------
 
 
-# ---- _INPUT READER -------------------------------------------------------------------
+# ---- _input_reader -------------------------------------------------------------------
 def _input_reader(text: str, indent: str = '') -> str:
     """
     ---- Summary ----
@@ -74,7 +79,7 @@ def _input_reader(text: str, indent: str = '') -> str:
         raise UserQuit()
 
 
-# ---- _NUMBER BUILDER -----------------------------------------------------------------
+# ---- _number_builder -----------------------------------------------------------------
 def _number_builder(depth: int) -> str:
     """
     ---- Summary ----
@@ -108,7 +113,7 @@ def _number_builder(depth: int) -> str:
     return '.'.join(str(c) for c in _counters[:depth + 1])
 
 
-# ---- _QUESTION PRINTER ---------------------------------------------------------------
+# ---- _question_printer ---------------------------------------------------------------
 def _question_printer(question: str, depth: int, hint: str = '') -> str:
     """
     ---- Summary ----
@@ -153,7 +158,7 @@ def _question_printer(question: str, depth: int, hint: str = '') -> str:
 # ---- MAIN FUNCTIONS ------------------------------------------------------------------
 
 
-# ---- CHOICE ASKER --------------------------------------------------------------------
+# ---- choice_asker --------------------------------------------------------------------
 def choice_asker(question: str,
                  options: Sequence[Tuple[str, str]],
                  default: Optional[str] = None,
@@ -216,7 +221,7 @@ def choice_asker(question: str,
         print(f'{indent}Please type a number from 1 to {len(options)}.')
 
 
-# ---- COLOUR CHECKER ------------------------------------------------------------------
+# ---- colour_checker ------------------------------------------------------------------
 def colour_checker() -> bool:
     """
     ---- Summary ----
@@ -253,7 +258,7 @@ def colour_checker() -> bool:
     return True
 
 
-# ---- HEADING PRINTER -----------------------------------------------------------------
+# ---- heading_printer -----------------------------------------------------------------
 def heading_printer(text: str) -> None:
     """
     ---- Summary ----
@@ -283,7 +288,7 @@ def heading_printer(text: str) -> None:
     print(f"\n{text_colourer(text, COLOUR_SECTION)}\n{'-' * len(text)}")
 
 
-# ---- INFO PRINTER --------------------------------------------------------------------
+# ---- info_printer --------------------------------------------------------------------
 def info_printer(text: str, depth: int = 1, tight: bool = False) -> None:
     """
     ---- Summary ----
@@ -320,7 +325,7 @@ def info_printer(text: str, depth: int = 1, tight: bool = False) -> None:
     _tight_next = tight
 
 
-# ---- INPUT FLUSHER -------------------------------------------------------------------
+# ---- input_flusher -------------------------------------------------------------------
 def input_flusher() -> None:
     """
     ---- Summary ----
@@ -360,7 +365,7 @@ def input_flusher() -> None:
         pass
 
 
-# ---- MULTI ASKER ---------------------------------------------------------------------
+# ---- multi_asker ---------------------------------------------------------------------
 def multi_asker(question: str,
                 options: Sequence[str],
                 default_all: bool = True,
@@ -441,7 +446,7 @@ def multi_asker(question: str,
         print(f'{indent}Please type numbers from 1 to {len(options)}, e.g. 1,3.')
 
 
-# ---- NUMBER ASKER --------------------------------------------------------------------
+# ---- number_asker --------------------------------------------------------------------
 def number_asker(question: str,
                  default: Optional[float] = None,
                  minimum: Optional[float] = None,
@@ -530,7 +535,7 @@ def number_asker(question: str,
         return value
 
 
-# ---- NUMBERING RESTARTER -------------------------------------------------------------
+# ---- numbering_restarter -------------------------------------------------------------
 def numbering_restarter(depth: int) -> None:
     """
     ---- Summary ----
@@ -561,7 +566,7 @@ def numbering_restarter(depth: int) -> None:
         _counters[level] = 0
 
 
-# ---- NUMBERING SETTER ----------------------------------------------------------------
+# ---- numbering_setter ----------------------------------------------------------------
 def numbering_setter(depth: int, value: int) -> None:
     """
     ---- Summary ----
@@ -596,7 +601,7 @@ def numbering_setter(depth: int, value: int) -> None:
         _counters[level] = 0
 
 
-# ---- NUMBERS ASKER -------------------------------------------------------------------
+# ---- numbers_asker -------------------------------------------------------------------
 def numbers_asker(question: str, count: int, depth: int = 1) -> List[int]:
     """
     ---- Summary ----
@@ -647,7 +652,7 @@ def numbers_asker(question: str, count: int, depth: int = 1) -> List[int]:
         print(f'{indent}Please type numbers from 1 to {count}, e.g. 1,3.')
 
 
-# ---- PATH CLEANER --------------------------------------------------------------------
+# ---- path_cleaner --------------------------------------------------------------------
 def path_cleaner(text: str) -> str:
     """
     ---- Summary ----
@@ -678,7 +683,7 @@ def path_cleaner(text: str) -> str:
     return text.strip().strip('"').strip("'").strip()
 
 
-# ---- PROGRESS CLEARER ----------------------------------------------------------------
+# ---- progress_clearer ----------------------------------------------------------------
 def progress_clearer() -> None:
     """
     ---- Summary ----
@@ -707,7 +712,7 @@ def progress_clearer() -> None:
     print('\r' + ' ' * 100 + '\r', end='', flush=True)
 
 
-# ---- PROGRESS PRINTER ----------------------------------------------------------------
+# ---- progress_printer ----------------------------------------------------------------
 def progress_printer(text: str) -> None:
     """
     ---- Summary ----
@@ -737,7 +742,7 @@ def progress_printer(text: str) -> None:
     print(f'\r{text}'.ljust(100), end='', flush=True)
 
 
-# ---- SECTION STARTER -----------------------------------------------------------------
+# ---- section_starter -----------------------------------------------------------------
 def section_starter(title: str) -> None:
     """
     ---- Summary ----
@@ -772,7 +777,7 @@ def section_starter(title: str) -> None:
     print(f"\n{text_colourer(text, COLOUR_SECTION)}\n{'-' * len(text)}")
 
 
-# ---- TEXT ASKER ----------------------------------------------------------------------
+# ---- text_asker ----------------------------------------------------------------------
 def text_asker(question: str,
                default: Optional[str] = None,
                depth: int = 1,
@@ -814,7 +819,7 @@ def text_asker(question: str,
     return answer if answer else default
 
 
-# ---- TEXT COLOURER -------------------------------------------------------------------
+# ---- text_colourer -------------------------------------------------------------------
 def text_colourer(text: str, code: str = COLOUR_QUESTION) -> str:
     """
     ---- Summary ----
@@ -846,7 +851,7 @@ def text_colourer(text: str, code: str = COLOUR_QUESTION) -> str:
     return f'{code}{text}{RESET}' if colour_checker() else text
 
 
-# ---- TEXT ITALISER -------------------------------------------------------------------
+# ---- text_italiser -------------------------------------------------------------------
 def text_italiser(text: str) -> str:
     """
     ---- Summary ----
@@ -876,7 +881,7 @@ def text_italiser(text: str) -> str:
     return f'{ITALIC}{text}{RESET}' if colour_checker() else text
 
 
-# ---- YES NO ASKER --------------------------------------------------------------------
+# ---- yes_no_asker --------------------------------------------------------------------
 def yes_no_asker(question: str, default: bool = False, depth: int = 1) -> bool:
     """
     ---- Summary ----

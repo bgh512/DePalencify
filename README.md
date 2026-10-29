@@ -1,109 +1,218 @@
-# DePalencify
+# DePalencify (V1.0)
 
-One-click processing of Espana Scientific Software (Palencia / Tarragona / Gerona)
-`.paf` files. Double-click `run.bat` (Windows) or `run.command` / `run.sh`
-(Mac / Linux). The program reads every `.paf` in a folder directly, asks its
-questions in the terminal, plots each experiment, and exports an Excel workbook
-per experiment.
+Reads Espana Scientific Software `.paf` files, plots every experiment and the combined figures, and exports Excel workbooks that can be checked by hand.
 
-## What it asks, in order
+## 1. Installation
 
-Questions are numbered, shown in colour, and the answer is typed on the line below
-(Enter accepts the [default]). Follow-up questions are indented and numbered one level
-deeper (3.1 then 3.1.1).
+### 1.1 Using GitHub (recommended)
 
-1. **Your files**: the .paf folder, the results folder
-2. **Trimming and ignoring**: TRIM (data that is not imported, plotted or used) and
-   IGNORE (data that is plotted but not used for calculations), each for the start and
-   the end. Ignore times count from the new 0 after trimming. The values are
-   remembered per file for the next run.
-3. **Analysis**: decompose the haems (which fit), scale by OD (OD, volume and dilution
-   factor per file), average around the events (window, gap), change event labels.
-   Write `ignore` as an event's label to ignore an event that was not an addition.
-4. **Individual experiment plots**: oxygen, OCR, haems, event-label angle, journal and size
-5. **Multi-experiment plots**: two experiments side by side, four experiments in a 2x2 grid
-6. **Experiment summaries**: time response, haem and OCR response
-7. **Data export**, then a summary and the start question
+Git and Python 3.9 or newer must be installed first. If they are not, follow the requirements in section 1.2, then return here.
 
-Every figure asks for its own journal. Answering `None` uses Nature with the default
-size: individual 1 column x 0.5 page, side by side and 2x2 1.5 columns x 0.7 page, time
-response and haem and OCR response 2 columns x 0.75 page.
+#### Windows
 
-## Special figures
+1. Open a terminal: press the Windows key, type `PowerShell` and press Enter.
+2. Go to the folder where the project should be installed:
 
-Both run from the `.paf` files through the same reader as everything else; no
-exported binary or text files are needed. Both need a haem fit in `fits/`, so
-choosing either one switches the decomposition on.
+    ```powershell
+    cd C:\Users\<username>\Documents
+    ```
 
-### Time response
-File names need a group word and the hours: `control_7hours`,
-`knockdown_24hours`. Spectra are averaged in the event windows, the last two
-windows are subtracted (penultimate minus final), and that difference spectrum is
-decomposed into haems. The figure is a 3 x 3 grid: a waterfall of each group (plots 1
-and 4), two kinetic traces (2-3 and 5-6) and three decomposition plots (7-9), each
-chosen by its own question; time points can be skipped in the waterfalls. Output:
-`time_response_figure.*` in the results folder and
-`<group>_difference_spectra.csv`, `<group>_haem_percentages.csv` in `triplicate_data/`.
+3. Download the project and enter its folder:
 
-### Haem and OCR response
-File names need strain, addition order and run: `knockdown_kcn_then_bd_run1`,
-`control_bd_then_kcn_run2`. Runs of one condition are combined (mean, SEM,
-Student t-tests with Holm correction). Output: `publication_figure.*` (baseline OCR
-bars, OCR response, haem response) in the results folder, and
-`triplicate_summary.xlsx` and the t-test table in `triplicate_data/`. The averaging windows are those of section 3.
+    ```powershell
+    git clone https://github.com/bgh512/DePalencify.git
+    cd DePalencify
+    ```
 
-### Four experiments in a 2x2 grid (section 5)
-One run of each strain and addition order, drawn like the individual figures:
-`2x2_comparison.*` in the results folder.
+4. Create and activate a Python environment, then install the dependencies:
 
-Files whose names do not fit are listed and left out of that figure only.
+    ```powershell
+    python -m venv .venv
+    .venv\Scripts\Activate.ps1
+    python -m pip install -r requirements.txt
+    ```
 
-## Files
+    If PowerShell refuses to run the activation script, run `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned` once and try again. The launcher `run.bat` does this step itself, so it can be skipped if only the launcher is used.
 
-- `DePalencify.py` main program; `config.py` defaults and colours
-- `utils_shared/` reading, processing, plotting and export of single experiments
-- `utils_custom/` the special figures
-- `fits/` haem fit CSVs (your own fit goes here)
-- `FUNCTION_LIST.md`, `DATA_FORMAT.md`, `CODING_STYLE.md` project documentation
+#### macOS
 
-## Installation
+1. Open Terminal: press Cmd + Space, type `Terminal` and press Enter. If git is missing, run `xcode-select --install` first.
+2. Go to the folder where the project should be installed:
 
-Download the program from GitHub (needs [git](https://git-scm.com/) and Python 3.9 or newer):
+    ```bash
+    cd ~/Documents
+    ```
+
+3. Download the project and enter its folder:
+
+    ```bash
+    git clone https://github.com/bgh512/DePalencify.git
+    cd DePalencify
+    ```
+
+4. Create and activate a Python environment, then install the dependencies:
+
+    ```bash
+    python3 -m venv .venv
+    source .venv/bin/activate
+    python -m pip install -r requirements.txt
+    ```
+
+    The launchers `run.command` and `run.sh` do this step themselves, so it can be skipped if only a launcher is used.
+
+#### Linux
+
+1. Open a terminal (Ctrl + Alt + T on most distributions). On Debian or Ubuntu, install the requirements first:
+
+    ```bash
+    sudo apt install git python3 python3-venv python3-pip
+    ```
+
+2. Go to the folder where the project should be installed:
+
+    ```bash
+    cd ~/Documents
+    ```
+
+3. Download the project and enter its folder:
+
+    ```bash
+    git clone https://github.com/bgh512/DePalencify.git
+    cd DePalencify
+    ```
+
+4. Create and activate a Python environment, then install the dependencies:
+
+    ```bash
+    python3 -m venv .venv
+    source .venv/bin/activate
+    python -m pip install -r requirements.txt
+    ```
+
+### 1.2 Manual install
+
+No git is needed.
+
+#### Requirements
+
+- Python 3.9 or newer: <https://www.python.org/downloads/> (on Windows, tick "Add python.exe to PATH" in the installer).
+
+#### Install from the .zip
+
+1. On the project's GitHub page, click **Code**, then **Download ZIP**.
+2. Extract the .zip to the desired location.
+3. Open a terminal in the extracted folder:
+    - Windows: right-click inside the folder and choose **Open in Terminal**.
+    - macOS: right-click the folder and choose **New Terminal at Folder**.
+    - Linux: right-click inside the folder and choose **Open in Terminal**.
+4. Create and activate a Python environment, then install the dependencies:
+
+    Windows (PowerShell):
+
+    ```powershell
+    python -m venv .venv
+    .venv\Scripts\Activate.ps1
+    python -m pip install -r requirements.txt
+    ```
+
+    macOS and Linux:
+
+    ```bash
+    python3 -m venv .venv
+    source .venv/bin/activate
+    python -m pip install -r requirements.txt
+    ```
+
+### 1.3 Following the dev branch (optional)
+
+The steps above install `main`, the stable version. `dev` has newer changes that are not yet fully tested.
+
+- Installed with git: from inside the project folder run `git checkout dev`, then `git pull`. To go back to the stable version run `git checkout main`.
+- Manual install: on the project's GitHub page choose `dev` in the branch drop-down, click **Code**, then **Download ZIP**, and install as in section 1.2.
+
+## 2. Running
+
+### 2.1 From the terminal
+
+Activate the environment first (see section 1), then run:
+
+```bash
+python main.py
+```
+
+The program has no command-line options. It asks numbered questions in the terminal (Enter accepts the default in square brackets); the answers are remembered for the next run in `last_answers.json`.
+
+### 2.2 Using the launcher
+
+- Windows: double-click `run.bat`.
+- macOS: double-click `run.command`.
+- Linux: run `./run.sh`.
+
+The launchers create their own environment on the first run, install what is missing, check GitHub for updates when the folder is a git clone, and start `main.py`.
+
+### 2.3 The questions
+
+1. **Your files:** the `.paf` folder and the results folder.
+2. **Trimming and ignoring:** TRIM (data that is not imported, plotted or used) and IGNORE (data that is plotted but not used for calculations), each for the start and the end. Ignore times count from the new 0 after trimming.
+3. **Analysis:** decompose the haems (which fit), scale by OD, average around the events (window, gap), change event labels. Write `ignore` as an event's label to ignore an event that was not an addition.
+4. **Individual experiment plots:** oxygen, OCR, haems, event-label angle, journal and size.
+5. **Multi-experiment plots:** two experiments side by side, four experiments in a 2x2 grid.
+6. **Experiment summaries:** time response, OCR and haem response.
+7. **Data export**, then a summary and the start question.
+
+Every figure asks for its own journal. Answering `None` uses Nature with the default size.
+
+### 2.4 Outputs
+
+Everything goes into the results folder you chose:
+
+| Output | Description |
+|---|---|
+| `<experiment>/<experiment>.xlsx` and figure files | One workbook and one figure per experiment |
+| `2x2_comparison.*` | Four experiments in a 2x2 grid |
+| `ocr_and_haem_response.*` | Baseline OCR bars, OCR response and haem response (`.png`, `.svg`) |
+| `ocr_and_haem_response.xlsx` | Run values, averages, SEM and every significance test, written so the maths can be checked by hand |
+| `time_response.*` | The 3 x 3 time response figure (`.png`, `.svg`) |
+| `time_response.xlsx` | Difference spectra, haem percentages and the waterfall baseline, written so the maths can be checked by hand |
+| `logs/YYYY_MM_DD-HH_MM_SS.log` | Everything printed during the run, with the version, seed and settings |
+
+Both summary figures need a haem fit in `fits/`. File names must carry the information the figure needs: `knockdown_kcn_then_bd_run1` (strain, addition order, run) for the OCR and haem response, and `control_7hours` (group, hours) for the time response. Files whose names do not fit are listed and left out of that figure only.
+
+## 3. Project structure
 
 ```
-git clone https://github.com/bgh512/DePalencify.git
-cd DePalencify
-git checkout dev
+DePalencify/
+    make_zip.bat            zips the project for sharing (Windows)
+    main.py                 entry point
+    config.py               defaults, journal sizes and colours
+    run.bat, run.command, run.sh   launchers
+    launchers/              desktop shortcut scripts
+    assets/                 icons
+    fits/                   haem fit CSVs (your own fit goes here)
+    utils_shared/           reading, processing, plotting and export of single experiments
+        __init__.py
+        paf_reader.py       direct .paf reader
+        ...
+    utils_custom/           the multi-experiment figures and their workbooks
+        __init__.py
+        ocr_and_haem_response_plotter.py
+        time_response_plotter.py
+        ...
+    requirements.txt        Python dependencies
+    VERSION                 current version
+    README.md
+    FUNCTION_LIST.md
+    DATA_FORMAT.md
+    CLAUDE.md               imports the style guide for Claude
+    style/                  shared style guide (git submodule, contains CODING_STYLE.md)
 ```
 
-Without git, use the green **Code > Download ZIP** button on
-https://github.com/bgh512/DePalencify and unzip it. To update later, run
-`git pull` inside the folder (the launchers also check for updates).
+## 4. Links to other .md files
 
-## Requirements
+- [FUNCTION_LIST.md](FUNCTION_LIST.md): every function and class, with its docstring.
+- [DATA_FORMAT.md](DATA_FORMAT.md): custom data structures, units and formats.
+- [style/CODING_STYLE.md](style/CODING_STYLE.md): the coding and formatting standards used in this project.
 
-Python 3.9 or newer with numpy, pandas, scipy, matplotlib and openpyxl. The
-launchers install what is missing; to install by hand run
-`pip install numpy pandas scipy matplotlib openpyxl`.
+## 5. License
 
-## Running
-
-- Windows: double-click `run.bat`
-- Mac: double-click `run.command`
-- Linux / Mac terminal: `./run.sh`
-
-Or directly: `python DePalencify.py`. Answer the numbered questions; Enter accepts
-the [default].
-
-## Outputs
-
-In the results folder you chose, one sub-folder per run holds, for every `.paf` file:
-
-- one figure per experiment (`.svg` and `.png`, sized for the chosen journal)
-- one Excel workbook per experiment (CcO2, CsO2, VoO2, events and metadata sheets;
-  optionally everything and the spectra)
-- the comparison, time-response and haem/OCR figures if you asked for them
-- a log file of the run
-
-The OD, volume, dilution factor and event labels you type are saved in each
-workbook and offered again next time.
+No licence file has been added yet.

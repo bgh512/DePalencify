@@ -1,7 +1,5 @@
-# -*- coding: utf-8 -*-
 """
-Cut the start and/or end off an experiment. All times are minutes on the original
-recording's clock.
+Trimming of the start and end of an experiment.
 """
 
 # ---- STANDARD IMPORTS ----------------------------------------------------------------
@@ -17,7 +15,7 @@ from utils_shared.schema import TIME_COLUMN
 # ---- MAIN FUNCTIONS ------------------------------------------------------------------
 
 
-# ---- EXPERIMENT TRIMMER --------------------------------------------------------------
+# ---- experiment_trimmer --------------------------------------------------------------
 def experiment_trimmer(experiment: dict,
                        start_time: Optional[float] = None,
                        end_time: Optional[float] = None,
