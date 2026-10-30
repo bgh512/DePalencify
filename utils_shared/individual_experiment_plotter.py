@@ -956,6 +956,7 @@ def experiment_drawer(fig: Figure,
 def experiment_plotter(experiment: dict,
                        config: dict,
                        export_root: Path,
+                       fig: Optional[Figure] = None,
                        ) -> Tuple[Figure, List[Axes]]:
     """
     ---- Summary ----
@@ -970,6 +971,9 @@ def experiment_plotter(experiment: dict,
         config.py.
     export_root : Path
         Results folder.
+    fig : Optional[Figure]
+        An existing figure to clear and draw in (the experiment browser redraws one
+        window). It is left open. None makes a new figure.
 
     ---- Globals read ----
     config keys FIGURE_SIZE, FIGURE_DPI, TITLE_STYLE, LAYOUT_PAD_PT, FIT_MARGINS,
@@ -978,7 +982,8 @@ def experiment_plotter(experiment: dict,
 
     ---- Outputs ----
     Tuple[Figure, List[Axes]]
-        The figure (already closed unless SHOW_INDIVIDUAL_FIGURES is set) and its axes.
+        The figure (already closed unless SHOW_INDIVIDUAL_FIGURES is set or a figure was
+        given) and its axes.
 
     ---- Globals mutated ----
     None. Writes <export_root>/<name>/<name>.svg and .png and prints a message (side
@@ -998,7 +1003,12 @@ def experiment_plotter(experiment: dict,
     # ---- 1 Draw the figure -----------------------------------------------------------
     name = experiment['experiment_name']
     export_root = Path(export_root)
-    fig = plt.figure(figsize=config['FIGURE_SIZE'], dpi=config['FIGURE_DPI'])
+    is_given = fig is not None
+    if is_given:
+        fig.clf()
+        fig.set_size_inches(*config['FIGURE_SIZE'])
+    else:
+        fig = plt.figure(figsize=config['FIGURE_SIZE'], dpi=config['FIGURE_DPI'])
     axes, panels = experiment_drawer(fig,
                                      fig.add_gridspec(1, 1)[0, 0],
                                      experiment,
@@ -1058,7 +1068,9 @@ def experiment_plotter(experiment: dict,
               )
 
     # ---- 5 Show the figure -----------------------------------------------------------
-    if config['SHOW_INDIVIDUAL_FIGURES']:
+    if is_given:
+        pass  # the caller keeps the figure open
+    elif config['SHOW_INDIVIDUAL_FIGURES']:
         plt.show()
     else:
         plt.close(fig)

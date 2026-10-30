@@ -152,17 +152,34 @@ The launchers create their own environment on the first run, install what is mis
 
 ### 2.3 The questions
 
-1. **Your files:** the `.paf` folder and the results folder.
-2. **Trimming and ignoring:** TRIM (data that is not imported, plotted or used) and IGNORE (data that is plotted but not used for calculations), each for the start and the end. Ignore times count from the new 0 after trimming.
-3. **Analysis:** decompose the haems (which fit), scale by OD, average around the events (window, gap), change event labels. Write `ignore` as an event's label to ignore an event that was not an addition.
-4. **Individual experiment plots:** oxygen, OCR, haems, event-label angle, journal and size.
-5. **Multi-experiment plots:** two experiments side by side, four experiments in a 2x2 grid.
-6. **Experiment summaries:** time response, OCR and haem response.
-7. **Data export**, then a summary and the start question.
+1. **Your files:** the `.paf` folder, the results folder, and whether to use the experiment browser (see section 2.4).
+2. **Experiment browser** (only with the browser on): look through the files in the plot window.
+3. **Trimming and ignoring:** TRIM (data that is not imported, plotted or used) and IGNORE (data that is plotted but not used for calculations), each for the start and the end. Ignore times count from the new 0 after trimming.
+4. **Analysis:** decompose the haems (which fit), scale by OD, average around the events (window, gap), change event labels. Write `ignore` as an event's label to ignore an event that was not an addition.
+5. **Individual experiment plots:** oxygen, OCR, haems, event-label angle, journal and size.
+6. **Multi-experiment plots:** two experiments side by side, four experiments in a 2x2 grid.
+7. **Experiment summaries:** time response, OCR and haem response.
+8. **Data export**, then a summary and the start question.
+
+The numbers above are those with the experiment browser on; with it off, section 2 is left out and the later sections move up by one.
 
 Every figure asks for its own journal. Answering `None` uses Nature with the default size.
 
-### 2.4 Outputs
+### 2.4 The experiment browser
+
+With the browser on (the default, question 1.3), the plot window shows the experiment you are asking about and is redrawn after each answer. The terminal is still the only place you type: the plot window is for looking, and it cannot be clicked to change anything. It does not respond to zooming or dragging while a question is waiting for an answer.
+
+- **Experiment browser:** step through the files (next, previous, go to a file) and look at the set and measured O2, the OCR and the events.
+- **Trimming and ignoring:** after the four questions, the whole recording is drawn with the TRIMMED part grey and hatched and the IGNORED part amber. Answer *Yes, accept*, *No, enter the limits again* (your answers are offered as the defaults) or *Look at another file in the plot window first*.
+- **Analysis:** the decomposition, OD scaling, averaging windows and event labels are each drawn for the current file and accepted or asked again in the same way.
+- **Individual experiment plots:** the figure is drawn at the journal size you chose, and can be accepted or changed.
+- **Going back:** after the individual plots you can go back to any earlier step. Its questions are asked again with your answers as the defaults, and your answers to the later steps are kept.
+
+The previews use the same processing as the final run, so what is shown is what is saved. Only one file is previewed at a time (use *Look at another file* to check others), and the multi-experiment figures (sections 6 and 7) are made after the questions, as before.
+
+If no plot window can be opened (for example no display, or no GUI library such as tkinter or Qt), each preview is saved as a picture (`DePalencify_preview.png` in the temporary folder) and opened in the default picture viewer; the path is printed. Answer `n` to question 1.3 to use the questions without the browser.
+
+### 2.5 Outputs
 
 Everything goes into the results folder you chose:
 
@@ -192,7 +209,13 @@ DePalencify/
     utils_shared/           reading, processing, plotting and export of single experiments
         __init__.py
         paf_reader.py       direct .paf reader
+        experiment_processing.py   the processing steps shared by the run and the previews
         ...
+    utils_viewer/           the experiment browser (plot window previews of each step)
+        __init__.py
+        viewer_window.py    the plot window (or the preview picture when there is no window)
+        viewer_preview.py   processes and draws one file as a preview
+        viewer_stages.py    the browser, trim, analysis and plot steps and going back
     utils_custom/           the multi-experiment figures and their workbooks
         __init__.py
         ocr_and_haem_response_plotter.py

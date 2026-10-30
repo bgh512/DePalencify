@@ -421,12 +421,8 @@ def analysis_asker(summaries: List[dict],
     averaging_asker
     decomposition_asker
     event_asker
-    info_printer
-    od_asker
-    progress_clearer
-    progress_printer
-    saved_settings_reader
-    yes_no_asker
+    od_scaling_asker
+    saved_values_reader
     """
 
     # ---- 1 Decomposition -------------------------------------------------------------
@@ -437,57 +433,8 @@ def analysis_asker(summaries: List[dict],
      ) = decomposition_asker(summaries, defaults, fits_folder)
 
     # ---- 2 OD scaling ----------------------------------------------------------------
-    saved = {}
-    for number, summary in enumerate(summaries, start=1):
-        progress_printer(f'Looking for earlier values, file {number} of '
-                         f'{len(summaries)} ...',
-                         )
-        saved[summary['name']] = saved_settings_reader(export_root, summary['name'])
-    progress_clearer()
-    if any(saved.values()):
-        info_printer("\nEarlier OD and event values found in the experiments' "
-                     'workbooks are '
-                     'offered as defaults.',
-                     )
-    answers['normalise_od'] = yes_no_asker('Do you want to scale by OD (divide by '
-                                           'dilution factor x OD x volume)?',
-                                           defaults['normalise_od'],
-                                           )
-    details = {s['name']: {} for s in summaries}
-    if answers['normalise_od']:
-        # List what is already stored for each run and only ask about the rest unless
-        # the user wants to change them.
-        stored_keys = ('OD', 'volume', 'dilution_factor')
-        complete = [s for s in summaries
-                    if all((saved.get(s['name']) or {}).get(k) for k in stored_keys[:2])
-                    ]
-        if complete:
-            info_printer('\nStored OD information:', depth=2, tight=True)
-            for summary in summaries:
-                old = saved.get(summary['name']) or {}
-                if summary in complete:
-                    text = (f"OD {old['OD']:g}, volume {old['volume']:g} mL, dilution "
-                            f"factor {old.get('dilution_factor', 1.0):g}"
-                            )
-                else:
-                    text = 'nothing stored'
-                info_printer(f"  {summary['name']}: {text}", depth=2, tight=True)
-        change = (not complete) or yes_no_asker('Do you want to change any of these?',
-                                                False,
-                                                )
-        to_ask = summaries if change else [s for s in summaries if s not in complete]
-        for summary in complete:
-            if summary not in to_ask:
-                old = saved[summary['name']]
-                dilution = old.get('dilution_factor', 1.0)
-                details[summary['name']].update({'OD': old['OD'],
-                                                 'volume': old['volume'],
-                                                 'dilution_factor': dilution,
-                                                 },
-                                                )
-        if to_ask:
-            for name, values in od_asker(to_ask, saved).items():
-                details[name].update(values)
+    saved = saved_values_reader(summaries, export_root)
+    details = od_scaling_asker(summaries, answers, defaults, saved)
 
     # ---- 3 Averaging -----------------------------------------------------------------
     averaging_asker(answers, defaults)
@@ -1203,6 +1150,96 @@ def od_asker(summaries: List[dict], saved: dict) -> Dict[str, dict]:
     return values
 
 
+# ---- od_scaling_asker ----------------------------------------------------------------
+def od_scaling_asker(summaries: List[dict],
+                     answers: dict,
+                     defaults: dict,
+                     saved: dict,
+                     ) -> Dict[str, dict]:
+    """
+    ---- Summary ----
+    Main function to ask whether to scale by OD and, if so, the OD, volume and dilution
+    factor of every file, offering the stored values.
+
+    ---- Inputs ----
+    summaries : List[dict]
+        File summaries (DATA_FORMAT.md).
+    answers : dict
+        Answers dictionary the values are stored in.
+    defaults : dict
+        Default answers (normalise_od).
+    saved : dict
+        {file name: values read from its workbook} (saved_values_reader).
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    Dict[str, dict]
+        {file name: {'OD', 'volume', 'dilution_factor'}}; the dictionaries are empty
+        when not scaling by OD.
+
+    ---- Globals mutated ----
+    None. Stores normalise_od in ``answers`` and reads from and prints to the terminal
+    (side effects).
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    info_printer
+    od_asker
+    yes_no_asker
+    """
+
+    # ---- 1 Ask whether to scale ------------------------------------------------------
+    answers['normalise_od'] = yes_no_asker('Do you want to scale by OD (divide by '
+                                           'dilution factor x OD x volume)?',
+                                           defaults['normalise_od'],
+                                           )
+    details = {s['name']: {} for s in summaries}
+    if not answers['normalise_od']:
+        return details
+
+    # ---- 2 List what is stored -------------------------------------------------------
+    # List what is already stored for each run and only ask about the rest unless
+    # the user wants to change them.
+    stored_keys = ('OD', 'volume', 'dilution_factor')
+    complete = [s for s in summaries
+                if all((saved.get(s['name']) or {}).get(k) for k in stored_keys[:2])
+                ]
+    if complete:
+        info_printer('\nStored OD information:', depth=2, tight=True)
+        for summary in summaries:
+            old = saved.get(summary['name']) or {}
+            if summary in complete:
+                text = (f"OD {old['OD']:g}, volume {old['volume']:g} mL, dilution "
+                        f"factor {old.get('dilution_factor', 1.0):g}"
+                        )
+            else:
+                text = 'nothing stored'
+            info_printer(f"  {summary['name']}: {text}", depth=2, tight=True)
+
+    # ---- 3 Ask for the values --------------------------------------------------------
+    change = (not complete) or yes_no_asker('Do you want to change any of these?',
+                                            False,
+                                            )
+    to_ask = summaries if change else [s for s in summaries if s not in complete]
+    for summary in complete:
+        if summary not in to_ask:
+            old = saved[summary['name']]
+            dilution = old.get('dilution_factor', 1.0)
+            details[summary['name']].update({'OD': old['OD'],
+                                             'volume': old['volume'],
+                                             'dilution_factor': dilution,
+                                             },
+                                            )
+    if to_ask:
+        for name, values in od_asker(to_ask, saved).items():
+            details[name].update(values)
+    return details
+
+
 # ---- paf_finder ----------------------------------------------------------------------
 def paf_finder(folder: Path) -> List[Path]:
     """
@@ -1351,6 +1388,54 @@ def plot_asker(answers: dict, defaults: dict, fit: Optional[dict]) -> bool:
                (1, 0.5),
                )
     return plotted
+
+
+# ---- saved_values_reader -------------------------------------------------------------
+def saved_values_reader(summaries: List[dict], export_root: Path) -> Dict[str, dict]:
+    """
+    ---- Summary ----
+    Main function to read the OD and event values saved in each experiment's workbook
+    from an earlier run, so they can be offered as defaults.
+
+    ---- Inputs ----
+    summaries : List[dict]
+        File summaries (DATA_FORMAT.md).
+    export_root : Path
+        Results folder, where the saved workbooks are looked for.
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    Dict[str, dict]
+        {file name: values read from its workbook, or None when there is none}.
+
+    ---- Globals mutated ----
+    None. Prints progress and a note when earlier values are found (side effects).
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    info_printer
+    progress_clearer
+    progress_printer
+    saved_settings_reader
+    """
+
+    saved = {}
+    for number, summary in enumerate(summaries, start=1):
+        progress_printer(f'Looking for earlier values, file {number} of '
+                         f'{len(summaries)} ...',
+                         )
+        saved[summary['name']] = saved_settings_reader(export_root, summary['name'])
+    progress_clearer()
+    if any(saved.values()):
+        info_printer("\nEarlier OD and event values found in the experiments' "
+                     'workbooks are '
+                     'offered as defaults.',
+                     )
+    return saved
 
 
 # ---- size_asker ----------------------------------------------------------------------

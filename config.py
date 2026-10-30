@@ -14,7 +14,8 @@ from utils_shared.helpers import name_simplifier
 
 
 # ---- CONSTANTS -----------------------------------------------------------------------
-DEFAULT_ANSWERS = {'ignore_first_minutes': 5.0,  # left out of baselines and ranges
+DEFAULT_ANSWERS = {'use_viewer': True,  # check each step in the experiment browser
+                   'ignore_first_minutes': 5.0,  # left out of baselines and ranges
                    # the same at the end of the recording
                    'ignore_last_minutes': 0.0,
                    'decompose': False,

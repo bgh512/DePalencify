@@ -1,8 +1,8 @@
 # DePalencify - Function List
 
 - **Project:** DePalencify
-- **Version:** V1.0
-- **Date:** 29/10/2026
+- **Version:** V2.2
+- **Date:** 30/10/2026
 
 ## Contents
 
@@ -11,7 +11,6 @@
     - [`haem_colour_mapper`](#haem_colour_mapper)
 - [`main.py`](#mainpy)
     - [`comparison_maker`](#comparison_maker)
-    - [`event_settings_merger`](#event_settings_merger)
     - [`everything_asker`](#everything_asker)
     - [`experiment_processor`](#experiment_processor)
     - [`last_answers_loader`](#last_answers_loader)
@@ -91,6 +90,47 @@
     - [`_tick_label_builder`](#_tick_label_builder)
     - [`_window_orderer`](#_window_orderer)
     - [`ocr_and_haem_response_figure_plotter`](#ocr_and_haem_response_figure_plotter)
+- [`utils_custom/publication_plotter.py`](#utils_custompublication_plotterpy)
+    - [`_axes_styler`](#_axes_styler)
+    - [`_baseline_bar_plotter`](#_baseline_bar_plotter)
+    - [`_block_gap_calculator`](#_block_gap_calculator)
+    - [`_column_chooser`](#_column_chooser)
+    - [`_condition_indexer`](#_condition_indexer)
+    - [`_crop_start_finder`](#_crop_start_finder)
+    - [`_exemplar_gap_calculator`](#_exemplar_gap_calculator)
+    - [`_exemplar_plotter`](#_exemplar_plotter)
+    - [`_exemplar_selector`](#_exemplar_selector)
+    - [`_experiment_classifier`](#_experiment_classifier)
+    - [`_experiment_cropper`](#_experiment_cropper)
+    - [`_figure_finisher`](#_figure_finisher)
+    - [`_haem_block_plotter`](#_haem_block_plotter)
+    - [`_haem_label_finder`](#_haem_label_finder)
+    - [`_haem_label_pad_calculator`](#_haem_label_pad_calculator)
+    - [`_haem_row_selector`](#_haem_row_selector)
+    - [`_haem_source_finder`](#_haem_source_finder)
+    - [`_layout_validator`](#_layout_validator)
+    - [`_legend_handle_builder`](#_legend_handle_builder)
+    - [`_mean_ylim_setter`](#_mean_ylim_setter)
+    - [`_measurement_finder`](#_measurement_finder)
+    - [`_metric_field_selector`](#_metric_field_selector)
+    - [`_ocr_block_plotter`](#_ocr_block_plotter)
+    - [`_outside_bar_drawer`](#_outside_bar_drawer)
+    - [`_p_value_adjuster`](#_p_value_adjuster)
+    - [`_reference_level_finder`](#_reference_level_finder)
+    - [`_reference_selector`](#_reference_selector)
+    - [`_response_axes_preparer`](#_response_axes_preparer)
+    - [`_response_metric_checker`](#_response_metric_checker)
+    - [`_response_series_drawer`](#_response_series_drawer)
+    - [`_response_window_tester`](#_response_window_tester)
+    - [`_row_ylim_sharer`](#_row_ylim_sharer)
+    - [`_significance_bar_drawer`](#_significance_bar_drawer)
+    - [`_significance_formatter`](#_significance_formatter)
+    - [`_test_bar_drawer`](#_test_bar_drawer)
+    - [`_tick_label_builder`](#_tick_label_builder)
+    - [`_window_orderer`](#_window_orderer)
+    - [`exemplar_figure_plotter`](#exemplar_figure_plotter)
+    - [`publication_figure_plotter`](#publication_figure_plotter)
+    - [`publication_figure_saver`](#publication_figure_saver)
 - [`utils_custom/run_namer.py`](#utils_customrun_namerpy)
     - [`_group_matcher`](#_group_matcher)
     - [`_natural_sorter`](#_natural_sorter)
@@ -134,6 +174,8 @@
     - [`_run_value_getter`](#_run_value_getter)
     - [`_window_sorter`](#_window_sorter)
     - [`triplicate_averager`](#triplicate_averager)
+- [`utils_custom/triplicate_exporter.py`](#utils_customtriplicate_exporterpy)
+    - [`triplicate_exporter`](#triplicate_exporter)
 - [`utils_custom/workbook_helpers.py`](#utils_customworkbook_helperspy)
     - [`formula_writer`](#formula_writer)
     - [`number_writer`](#number_writer)
@@ -149,6 +191,9 @@
     - [`_overhang_calculator`](#_overhang_calculator)
     - [`_renderer_getter`](#_renderer_getter)
     - [`comparison_figure_plotter`](#comparison_figure_plotter)
+- [`utils_shared/experiment_processing.py`](#utils_sharedexperiment_processingpy)
+    - [`event_settings_merger`](#event_settings_merger)
+    - [`experiment_data_processor`](#experiment_data_processor)
 - [`utils_shared/figure_layout.py`](#utils_sharedfigure_layoutpy)
     - [`_renderer_getter`](#_renderer_getter)
     - [`figure_canvas_fitter`](#figure_canvas_fitter)
@@ -223,6 +268,7 @@
     - [`input_flusher`](#input_flusher)
     - [`multi_asker`](#multi_asker)
     - [`number_asker`](#number_asker)
+    - [`numbering_getter`](#numbering_getter)
     - [`numbering_restarter`](#numbering_restarter)
     - [`numbering_setter`](#numbering_setter)
     - [`numbers_asker`](#numbers_asker)
@@ -272,12 +318,32 @@
     - [`multi_experiment_asker`](#multi_experiment_asker)
     - [`ocr_option_builder`](#ocr_option_builder)
     - [`od_asker`](#od_asker)
+    - [`od_scaling_asker`](#od_scaling_asker)
     - [`paf_finder`](#paf_finder)
     - [`plot_asker`](#plot_asker)
+    - [`saved_values_reader`](#saved_values_reader)
     - [`size_asker`](#size_asker)
     - [`trim_asker`](#trim_asker)
 - [`utils_shared/trimming.py`](#utils_sharedtrimmingpy)
     - [`experiment_trimmer`](#experiment_trimmer)
+- [`utils_viewer/viewer_preview.py`](#utils_viewerviewer_previewpy)
+    - [`ViewerSession`](#viewersession)
+    - [`_info_builder`](#_info_builder)
+    - [`_overlay_drawer`](#_overlay_drawer)
+    - [`_loaded_experiment_getter`](#_loaded_experiment_getter)
+    - [`preview_drawer`](#preview_drawer)
+- [`utils_viewer/viewer_stages.py`](#utils_viewerviewer_stagespy)
+    - [`_answers_previewer`](#_answers_previewer)
+    - [`_file_chooser`](#_file_chooser)
+    - [`_limits_lister`](#_limits_lister)
+    - [`_review_asker`](#_review_asker)
+    - [`analysis_stage_runner`](#analysis_stage_runner)
+    - [`browser_stage_runner`](#browser_stage_runner)
+    - [`plots_stage_runner`](#plots_stage_runner)
+    - [`trim_stage_runner`](#trim_stage_runner)
+    - [`viewer_asker`](#viewer_asker)
+- [`utils_viewer/viewer_window.py`](#utils_viewerviewer_windowpy)
+    - [`ViewerWindow`](#viewerwindow)
 
 ## `config.py`
 
@@ -517,37 +583,6 @@ figure_size_calculator
 plot_config_builder
 ```
 
-#### `event_settings_merger`
-
-```text
----- Summary ----
-Main function to copy the label, concentration and ignored flag entered for each
-event onto the experiment, and to move ignored events out of the working event list.
-
----- Inputs ----
-experiment : dict
-    Experiment dictionary, as defined in DATA_FORMAT.md.
-events : List[dict]
-    Entered events: {datapoint, label, concentration_uM, ignored}.
-
----- Globals read ----
-None.
-
----- Outputs ----
-None
-    Nothing.
-
----- Globals mutated ----
-None. Updates experiment["metadata"]["events"] in place and adds
-experiment["metadata"]["ignored_events"] (side effect).
-
----- Equations ----
-None.
-
----- Helpers ----
-None.
-```
-
 #### `everything_asker`
 
 ```text
@@ -586,6 +621,7 @@ plot_asker
 section_starter
 summary_figure_asker
 trim_asker
+viewer_asker
 yes_no_asker
 ```
 
@@ -609,9 +645,7 @@ export_root : Path
     Results folder.
 
 ---- Globals read ----
-settings.TRANSMISSION_MODE, settings.DEGREE_OF_SCATTER, settings.HAEM_FACTOR,
-settings.DELTA_ABS_WINDOW_SECONDS, settings.PERCENT_AVERAGE_WINDOW_SECONDS; plt
-(matplotlib.pyplot).
+plt (matplotlib.pyplot).
 
 ---- Outputs ----
 Optional[dict]
@@ -625,20 +659,11 @@ None. Writes the figure and the workbook files and prints progress (side effects
 None.
 
 ---- Helpers ----
-event_settings_merger
-experiment_attenuation_adder
-experiment_averages_calculator
-experiment_decomposer
-experiment_normaliser
-experiment_paf_loader
+experiment_data_processor
 experiment_plotter
 experiment_preparer
-experiment_trimmer
 experiment_workbook_exporter
-percent_converter
-percent_need_checker
 plot_config_builder
-source_chooser
 ```
 
 #### `last_answers_loader`
@@ -3173,6 +3198,1479 @@ experiment_classifier
 figure_finisher
 ```
 
+## `utils_custom/publication_plotter.py`
+
+Publication figure (baseline OCR, OCR response, haem response), exemplars.
+
+### _AXES STYLER
+
+#### `_axes_styler`
+
+```text
+---- Summary ----
+Helper function to apply the tick, grid and spine style of the response and baseline
+panels.
+
+---- Inputs ----
+ax : Axes
+    Matplotlib axes to draw on.
+config : dict
+    Figure settings dictionary built in custom_config.py.
+tick_size : float
+    Tick label size in points.
+pad : Optional[float]
+    Tick label pad in points, or None for the default.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Changes the style of ``ax`` (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+### _BASELINE BAR PLOTTER
+
+#### `_baseline_bar_plotter`
+
+```text
+---- Summary ----
+Helper function to draw the baseline OCR (average0) bar chart per group, with every
+run overlaid and a Student t-test bracket between the two groups.
+
+---- Inputs ----
+ax : Axes
+    Matplotlib axes to draw on.
+experiments : dict
+    Experiment dictionaries keyed by experiment name, as defined in DATA_FORMAT.md.
+strains : tuple
+    Group names (rows or bars), in drawing order.
+config : dict
+    Figure settings dictionary built in custom_config.py.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Draws on ``ax`` (side effect).
+
+---- Equations ----
+Bar height = mean of the run baselines; error bar = SEM = SD / sqrt(n). Student
+t-test with equal variances between the two groups.
+
+---- Helpers ----
+_axes_styler
+_column_chooser
+_experiment_classifier
+_significance_bar_drawer
+_significance_formatter
+finite_float_converter
+```
+
+### _BLOCK GAP CALCULATOR
+
+#### `_block_gap_calculator`
+
+```text
+---- Summary ----
+Helper function to calculate the gap below each block of the publication figure
+(each gap is sized for what it holds) and the gap between the response columns.
+
+---- Inputs ----
+config : dict
+    Figure settings dictionary built in custom_config.py.
+blocks : list
+    Block names from top to bottom ('baseline', 'ocr_response', 'haem_response').
+n_columns : int
+    Number of addition-order columns.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+tuple
+    (gaps in points, one per block but the last; wspace as a GridSpec fraction).
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+A gap above the first response block = x tick labels + 0.5 unit + title and legend
+row + 1.0 unit. The gap between the OCR and haem responses = two-line tick labels +
+0.5 unit + the significance bars' headroom + 0.5 unit. column_gap = 5 x 0.55 tick +
+0.5 unit + 1.5 unit (points).
+
+---- Helpers ----
+gap_space_calculator
+```
+
+### _COLUMN CHOOSER
+
+#### `_column_chooser`
+
+```text
+---- Summary ----
+Helper function to choose the OCR column: the preferred one if set, else VoO2, else
+the first available.
+
+---- Inputs ----
+available : Iterable
+    Column names that are available.
+preferred : Optional[str]
+    Column requested in the settings, or None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+Optional[str]
+    Chosen column name, or None if none is available.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+### _CONDITION INDEXER
+
+#### `_condition_indexer`
+
+```text
+---- Summary ----
+Helper function to map each (strain, order) pair to its condition name in the
+triplicate results.
+
+---- Inputs ----
+triplicates : dict
+    Across-run statistics per condition, from triplicate_averager (DATA_FORMAT.md).
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+dict
+    {(strain, order): condition name}. Raises ValueError if two conditions match one
+    pair.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+condition_classifier
+```
+
+### _CROP START FINDER
+
+#### `_crop_start_finder`
+
+```text
+---- Summary ----
+Helper function to find the time at which an exemplar crop begins.
+
+---- Inputs ----
+experiment : dict
+    Experiment dictionary, as defined in DATA_FORMAT.md.
+mode : str
+    'baseline' (start of the average0 window) or 'first_addition'.
+before_minutes : float
+    Minutes kept before the first addition.
+margin_minutes : float
+    Extra minutes kept before the baseline window.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+float
+    Crop start time in minutes.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+### _EXEMPLAR GAP CALCULATOR
+
+#### `_exemplar_gap_calculator`
+
+```text
+---- Summary ----
+Helper function to calculate the gap between rows and between columns of the
+exemplar quadrants.
+
+---- Inputs ----
+config : dict
+    Figure settings dictionary built in custom_config.py.
+individual_config : dict
+    Individual-experiment plot settings, as returned by Config.plot_config in
+    config.py.
+n_rows : int
+    Number of group rows.
+n_columns : int
+    Number of addition-order columns.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+tuple
+    (hspace, wspace) as GridSpec fractions.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+row_gap = 1.2 tick + 0.5 unit + label pad + 1.2 label + 1.0 unit; column_gap = lines
+x 1.2 label + y label pad + 5 x 0.55 tick + 0.5 unit + 1.5 unit (points) for one
+column, 1.5 unit when there are several (the later columns have no y labels).
+
+---- Helpers ----
+gap_space_calculator
+```
+
+### _EXEMPLAR PLOTTER
+
+#### `_exemplar_plotter`
+
+```text
+---- Summary ----
+Helper function to draw one experiment exactly as the individual plotter does.
+
+---- Inputs ----
+fig : Figure
+    Matplotlib figure.
+subplot_spec : SubplotSpec
+    Grid cell the experiment is drawn in.
+experiment : dict
+    Experiment dictionary, as defined in DATA_FORMAT.md.
+individual_config : dict
+    Individual-experiment plot settings, as returned by Config.plot_config in
+    config.py.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+list
+    Axes of the stacked panels.
+
+---- Globals mutated ----
+None. Adds axes to ``fig`` (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+experiment_drawer
+```
+
+### _EXEMPLAR SELECTOR
+
+#### `_exemplar_selector`
+
+```text
+---- Summary ----
+Helper function to pick the experiment of one run number for every (strain, order)
+cell.
+
+---- Inputs ----
+experiments : dict
+    Experiment dictionaries keyed by experiment name, as defined in DATA_FORMAT.md.
+run : int
+    Run number shown for each condition.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+dict
+    {(strain, order): experiment}. Raises ValueError if two experiments match one
+    cell.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_experiment_classifier
+```
+
+### _EXPERIMENT CLASSIFIER
+
+#### `_experiment_classifier`
+
+```text
+---- Summary ----
+Helper function to identify the strain, addition order and run number from an
+experiment name.
+
+---- Inputs ----
+name : str
+    Experiment name such as 'control_kcn_then_bd_run1'.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+tuple
+    (strain, order, run); entries are None where they cannot be identified.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+condition_classifier
+run_name_parser
+```
+
+### _EXPERIMENT CROPPER
+
+#### `_experiment_cropper`
+
+```text
+---- Summary ----
+Helper function to copy an experiment cropped to begin at a chosen time, with time
+measured from there.
+
+---- Inputs ----
+experiment : dict
+    Experiment dictionary, as defined in DATA_FORMAT.md.
+start : float
+    Time in minutes at which the crop begins.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+tuple
+    (cropped experiment copy, last time in minutes).
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+t_new = t - start; rows with t_new < 0 are dropped.
+
+---- Helpers ----
+time_getter
+```
+
+### _FIGURE FINISHER
+
+#### `_figure_finisher`
+
+```text
+---- Summary ----
+Helper function to fit the margins to the drawn content, add the panel letters at
+the top-left of each panel and fit again.
+
+---- Inputs ----
+fig : Figure
+    Matplotlib figure.
+config : dict
+    Figure settings dictionary built in custom_config.py.
+panels : list
+    List of (letter, main axes, [axes of the panel]) tuples.
+suptitle : Any
+    Figure title text object, or None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Resizes the layout of ``fig`` and adds text to it (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+figure_canvas_fitter
+panel_letter_adder
+```
+
+### _HAEM BLOCK PLOTTER
+
+#### `_haem_block_plotter`
+
+```text
+---- Summary ----
+Helper function to draw the haem response: one row per haem, one column per addition
+order, a line per group.
+
+---- Inputs ----
+fig : Figure
+    Matplotlib figure.
+spec : SubplotSpec
+    Grid cell the block is drawn in.
+orders : tuple
+    Addition-order names (columns), in drawing order.
+strains : tuple
+    Group names (rows or bars), in drawing order.
+triplicates : dict
+    Across-run statistics per condition, from triplicate_averager (DATA_FORMAT.md).
+conditions : dict
+    Lookup {(strain, order): condition name}.
+references : dict
+    Lookup {order: experiment or None} used for the event tick labels.
+config : dict
+    Figure settings dictionary built in custom_config.py.
+rows : list
+    Haem row dictionaries {haem, label}.
+haem_source : str
+    Haem source key, for example 'delta_abs_od'.
+tests : Optional[list]
+    List collecting t-test comparisons, or None to skip the tests.
+bars_above : bool
+    True draws the top row's significance bars in the white space above the block
+    (between it and the block above) instead of inside the axes.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+tuple
+    (grid of axes [row][column], invisible axes carrying the shared y label).
+
+---- Globals mutated ----
+None. Adds axes to ``fig`` and appends to ``tests`` (side effects).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_haem_label_finder
+_haem_label_pad_calculator
+_legend_handle_builder
+_measurement_finder
+_outside_bar_drawer
+_reference_level_finder
+_response_axes_preparer
+_response_series_drawer
+_response_window_tester
+_row_ylim_sharer
+_tick_label_builder
+_window_orderer
+```
+
+### _HAEM LABEL FINDER
+
+#### `_haem_label_finder`
+
+```text
+---- Summary ----
+Helper function to find the shared y label of the haem response rows.
+
+---- Inputs ----
+config : dict
+    Figure settings dictionary built in custom_config.py.
+metric : str
+    Response metric: 'delta', 'change' or 'value'.
+haem_source : str
+    Haem source key, for example 'delta_abs_od'.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+str
+    Label text from HAEM_RESPONSE_AXIS_LABELS for the metric and source.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+### _HAEM LABEL PAD CALCULATOR
+
+#### `_haem_label_pad_calculator`
+
+```text
+---- Summary ----
+Helper function to calculate the points between the shared haem label and the haem
+axes.
+
+---- Inputs ----
+config : dict
+    Figure settings dictionary built in custom_config.py.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+float
+    Label pad in points.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+pad = 1.2 label font + 0.5 unit + 5 x 0.55 tick font + 0.5 unit (points).
+
+---- Helpers ----
+None.
+```
+
+### _HAEM ROW SELECTOR
+
+#### `_haem_row_selector`
+
+```text
+---- Summary ----
+Helper function to select the haem response rows to draw, in the order listed in
+HAEM_RESPONSE_SHOW.
+
+---- Inputs ----
+config : dict
+    Figure settings dictionary built in custom_config.py.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+list
+    Row dictionaries {haem, label}. Every row is returned when HAEM_RESPONSE_SHOW is
+    empty. Entries are matched to a row label or haem name ignoring case and
+    punctuation.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+name_simplifier
+```
+
+### _HAEM SOURCE FINDER
+
+#### `_haem_source_finder`
+
+```text
+---- Summary ----
+Helper function to find the haem source that every condition's averages were
+calculated from.
+
+---- Inputs ----
+triplicates : dict
+    Across-run statistics per condition, from triplicate_averager (DATA_FORMAT.md).
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+str
+    Haem source key, for example 'delta_abs_od'. Raises ValueError if the conditions
+    differ.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+### _LAYOUT VALIDATOR
+
+#### `_layout_validator`
+
+```text
+---- Summary ----
+Helper function to check that the layout options of the publication figure are
+recognised and to return the group and order lists.
+
+---- Inputs ----
+config : dict
+    Figure settings dictionary built in custom_config.py.
+
+---- Globals read ----
+ORDER_TITLES, BLOCK_NAMES, RESPONSE_METRICS (module constants).
+
+---- Outputs ----
+tuple
+    (orders, strains): addition orders (columns) and groups (rows), as tuples.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+### _LEGEND HANDLE BUILDER
+
+#### `_legend_handle_builder`
+
+```text
+---- Summary ----
+Helper function to build legend entries showing each group's colour, line style and
+marker.
+
+---- Inputs ----
+strains : tuple
+    Group names (rows or bars), in drawing order.
+config : dict
+    Figure settings dictionary built in custom_config.py.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+list
+    Line2D handles, one per group.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+### _MEAN YLIM SETTER
+
+#### `_mean_ylim_setter`
+
+```text
+---- Summary ----
+Helper function to set the y range of a response panel from the group means (and
+the baseline level) only, so that a single outlier run or a very large error bar
+does not stretch the axis. Points and error bars beyond the range are clipped.
+
+---- Inputs ----
+ax : Axes
+    Response panel, with the series already drawn.
+series_list : list
+    One list of window statistics per strain, as drawn by _response_series_drawer.
+metric : str
+    Response metric, which decides the field holding the mean.
+baseline_level : Optional[float]
+    Reference level that must stay in view (for example 100 for % of baseline).
+margin : float
+    Fraction of the mean range added above and below.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None.
+
+---- Globals mutated ----
+None. Sets the y limits of ``ax`` (side effect); does nothing when no mean is
+finite.
+
+---- Equations ----
+low = min(means) - margin x range; high = max(means) + margin x range, where the
+range is max(means) - min(means) (at least 1 % of the largest absolute mean). When
+all means are on one side of the baseline, the baseline side gets a 3 % margin.
+
+---- Helpers ----
+_metric_field_selector
+```
+
+### _MEASUREMENT FINDER
+
+#### `_measurement_finder`
+
+```text
+---- Summary ----
+Helper function to find the column matching a wanted name, ignoring case and
+punctuation.
+
+---- Inputs ----
+available : Iterable
+    Column names that are available.
+wanted : str
+    Name to look for.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+Optional[str]
+    Matching column name, or None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+name_simplifier
+```
+
+### _METRIC FIELD SELECTOR
+
+#### `_metric_field_selector`
+
+```text
+---- Summary ----
+Helper function to name the keys of the triplicate statistics used by a response
+metric.
+
+---- Inputs ----
+metric : str
+    Response metric: 'delta', 'change' or 'value'.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+tuple
+    (mean key, sem key, n key, per-run values key).
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+### _OCR BLOCK PLOTTER
+
+#### `_ocr_block_plotter`
+
+```text
+---- Summary ----
+Helper function to draw the OCR response (percent of each run's baseline, mean and
+SEM across runs), one axes per addition order.
+
+---- Inputs ----
+fig : Figure
+    Matplotlib figure.
+spec : SubplotSpec
+    Grid cell the block is drawn in.
+orders : tuple
+    Addition-order names (columns), in drawing order.
+strains : tuple
+    Group names (rows or bars), in drawing order.
+triplicates : dict
+    Across-run statistics per condition, from triplicate_averager (DATA_FORMAT.md).
+conditions : dict
+    Lookup {(strain, order): condition name}.
+references : dict
+    Lookup {order: experiment or None} used for the event tick labels.
+config : dict
+    Figure settings dictionary built in custom_config.py.
+tests : Optional[list]
+    List collecting t-test comparisons, or None to skip the tests.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+list
+    The axes, one per addition order.
+
+---- Globals mutated ----
+None. Adds axes to ``fig`` and appends to ``tests`` (side effects).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_column_chooser
+_legend_handle_builder
+_response_axes_preparer
+_response_series_drawer
+_response_window_tester
+_row_ylim_sharer
+_tick_label_builder
+_window_orderer
+```
+
+### _OUTSIDE BAR DRAWER
+
+#### `_outside_bar_drawer`
+
+```text
+---- Summary ----
+Helper function to draw the significance bars stored by _response_window_tester in
+the white space just above an axes, so the plot keeps its full height.
+
+---- Inputs ----
+ax : Axes
+    Response panel whose y range is final.
+config : dict
+    Figure settings dictionary built in custom_config.py.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Draws on ``ax`` (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_test_bar_drawer
+```
+
+### _P VALUE ADJUSTER
+
+#### `_p_value_adjuster`
+
+```text
+---- Summary ----
+Helper function to adjust a list of p values for multiple comparisons.
+
+---- Inputs ----
+p_values : Iterable
+    Raw p values.
+method : str
+    'none', 'bonferroni' or 'holm'.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+np.ndarray
+    Adjusted p values, same order as the input.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+Bonferroni: p_adj = min(n p, 1). Holm: sort ascending, p_adj(i) = min(max over j <=
+i of (n - j) p(j), 1) with j counted from 0.
+
+---- Helpers ----
+None.
+```
+
+### _REFERENCE LEVEL FINDER
+
+#### `_reference_level_finder`
+
+```text
+---- Summary ----
+Helper function to find the height of the dashed reference line of the haem
+response.
+
+---- Inputs ----
+metric : str
+    Response metric: 'delta', 'change' or 'value'.
+haem_source : str
+    Haem source key, for example 'delta_abs_od'.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+Optional[float]
+    0 for a change, 100 for percent of baseline, 0 for a delta abs value, otherwise
+    None.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+### _REFERENCE SELECTOR
+
+#### `_reference_selector`
+
+```text
+---- Summary ----
+Helper function to pick, for each addition order, the first run of the first
+available group (used for the event tick labels).
+
+---- Inputs ----
+experiments : dict
+    Experiment dictionaries keyed by experiment name, as defined in DATA_FORMAT.md.
+triplicates : dict
+    Across-run statistics per condition, from triplicate_averager (DATA_FORMAT.md).
+conditions : dict
+    Lookup {(strain, order): condition name}.
+orders : tuple
+    Addition-order names (columns), in drawing order.
+strains : tuple
+    Group names (rows or bars), in drawing order.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+dict
+    {order: experiment or None}.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+### _RESPONSE AXES PREPARER
+
+#### `_response_axes_preparer`
+
+```text
+---- Summary ----
+Helper function to draw the baseline reference line and set the window ticks of a
+response panel.
+
+---- Inputs ----
+ax : Axes
+    Matplotlib axes to draw on.
+window_names : list
+    Averaging window names, for example ['average0', 'average1'].
+tick_labels : list
+    Tick label of every window.
+show_xlabels : bool
+    True to write the tick labels.
+config : dict
+    Figure settings dictionary built in custom_config.py.
+baseline_level : Optional[float]
+    Height of the reference line, or None for no line.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+np.ndarray
+    x positions of the windows.
+
+---- Globals mutated ----
+None. Changes the style of ``ax`` (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_axes_styler
+```
+
+### _RESPONSE METRIC CHECKER
+
+#### `_response_metric_checker`
+
+```text
+---- Summary ----
+Helper function to reject a percent-of-baseline response for the delta abs sources,
+which start at 0.
+
+---- Inputs ----
+metric : str
+    Response metric: 'delta', 'change' or 'value'.
+haem_source : str
+    Haem source key, for example 'delta_abs_od'.
+
+---- Globals read ----
+DELTA_HAEM_SOURCES (schema constant).
+
+---- Outputs ----
+None
+    Nothing. Raises ValueError for the combination that is not allowed.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+### _RESPONSE SERIES DRAWER
+
+#### `_response_series_drawer`
+
+```text
+---- Summary ----
+Helper function to plot every run as a point, the mean as a line and SEM error bars
+for one group.
+
+---- Inputs ----
+ax : Axes
+    Matplotlib axes to draw on.
+x : Iterable
+    x positions of the windows.
+stats_list : list
+    Statistics dictionary (or None) for each window.
+style : dict
+    Group style: colour, linestyle, marker.
+config : dict
+    Figure settings dictionary built in custom_config.py.
+label : Optional[str]
+    Unused legend text.
+metric : str
+    Response metric: 'delta', 'change' or 'value'.
+offset : float
+    Horizontal shift in x units so groups sit side by side.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+bool
+    True if anything was drawn.
+
+---- Globals mutated ----
+None. Draws on ``ax`` (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_metric_field_selector
+```
+
+### _RESPONSE WINDOW TESTER
+
+#### `_response_window_tester`
+
+```text
+---- Summary ----
+Helper function to run a Student t-test between the two groups at every window of a
+response panel and mark the significant windows.
+
+---- Inputs ----
+ax : Axes
+    Matplotlib axes to draw on.
+x : np.ndarray
+    x positions of the windows.
+windows : list
+    Window names.
+series_by_strain : dict
+    {strain: [statistics per window]}.
+strains : tuple
+    Group names (rows or bars), in drawing order.
+metric : str
+    Response metric: 'delta', 'change' or 'value'.
+config : dict
+    Figure settings dictionary built in custom_config.py.
+panel_name : str
+    Panel name written to the test table.
+tests : list
+    List collecting one dictionary per t-test comparison.
+outside : bool
+    True keeps the axis range as it is and stores the marks on ``ax`` for
+    _outside_bar_drawer, which draws them in the space above the axes.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Appends one dictionary per comparison to ``tests`` and draws on ``ax`` (side
+effects); with ``outside`` it sets ``ax.outside_marks`` instead of drawing.
+
+---- Equations ----
+Equal-variance Student t-test per window; p values adjusted across the windows of
+the panel (RESPONSE_TEST_CORRECTION); significant if p_adj < RESPONSE_TEST_ALPHA.
+
+---- Helpers ----
+_metric_field_selector
+_p_value_adjuster
+_test_bar_drawer
+```
+
+### _ROW YLIM SHARER
+
+#### `_row_ylim_sharer`
+
+```text
+---- Summary ----
+Helper function to give every axes in a row the union of their y ranges.
+
+---- Inputs ----
+axes_row : list
+    Axes of one row.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Sets the y limits of the axes (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+### _SIGNIFICANCE BAR DRAWER
+
+#### `_significance_bar_drawer`
+
+```text
+---- Summary ----
+Helper function to draw a bracket between two x positions with text centred above
+it.
+
+---- Inputs ----
+ax : Axes
+    Matplotlib axes to draw on.
+x_left : float
+    Left end of the bracket (data units).
+x_right : float
+    Right end of the bracket (data units).
+y : float
+    Height of the bracket (data units).
+text : str
+    Text written above the bracket.
+tick_size : float
+    Tick label size in points.
+config : dict
+    Figure settings dictionary built in custom_config.py.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Draws on ``ax`` (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+### _SIGNIFICANCE FORMATTER
+
+#### `_significance_formatter`
+
+```text
+---- Summary ----
+Helper function to format a p value as stars or as text.
+
+---- Inputs ----
+p_value : float
+    p value.
+style : str
+    'stars' or 'p'.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+str
+    '***', '**', '*' or 'ns' (stars style) or the p value text.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+### _TEST BAR DRAWER
+
+#### `_test_bar_drawer`
+
+```text
+---- Summary ----
+Helper function to draw a small bracket joining the two groups' points at one window
+with text above it.
+
+---- Inputs ----
+ax : Axes
+    Matplotlib axes to draw on.
+x_left : float
+    Left end (data units).
+x_right : float
+    Right end (data units).
+y : float
+    Data height the clearances are measured from.
+text : str
+    Stars written above the bracket.
+config : dict
+    Figure settings dictionary built in custom_config.py.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Draws on ``ax`` (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_offset_transformer
+```
+
+### _TICK LABEL BUILDER
+
+#### `_tick_label_builder`
+
+```text
+---- Summary ----
+Helper function to build the x tick labels of the averaging windows: Baseline, then
+the addition that precedes each window.
+
+---- Inputs ----
+experiment : Optional[dict]
+    Reference experiment whose events label the windows, or None.
+window_names : list
+    Averaging window names, for example ['average0', 'average1'].
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+list
+    One label per window; additions are written as label and concentration.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+finite_float_converter
+```
+
+### _WINDOW ORDERER
+
+#### `_window_orderer`
+
+```text
+---- Summary ----
+Helper function to list the averaging windows present in any condition of one
+addition order.
+
+---- Inputs ----
+order : str
+    Addition order name.
+strains : tuple
+    Group names (rows or bars), in drawing order.
+triplicates : dict
+    Across-run statistics per condition, from triplicate_averager (DATA_FORMAT.md).
+conditions : dict
+    Lookup {(strain, order): condition name}.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+list
+    Window names in numerical order.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+### EXEMPLAR FIGURE PLOTTER
+
+#### `exemplar_figure_plotter`
+
+```text
+---- Summary ----
+Main function to build the exemplar figure: one run per condition, each drawn by the
+individual plotter in its own quadrant.
+
+---- Inputs ----
+experiments : dict
+    Experiment dictionaries keyed by experiment name, as defined in DATA_FORMAT.md.
+config : dict
+    Exemplar figure settings from custom_config.exemplar_config_builder.
+individual_config : dict
+    Individual-experiment plot settings, as returned by Config.plot_config in
+    config.py.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+tuple
+    (fig, axes); axes maps (strain, order) to its list of axes and 'letters' to
+    {letter: experiment name}.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_crop_start_finder
+_exemplar_gap_calculator
+_exemplar_plotter
+_exemplar_selector
+_experiment_cropper
+_figure_finisher
+experiment_title_builder
+stack_legend_drawer
+watermark_style_builder
+```
+
+### PUBLICATION FIGURE PLOTTER
+
+#### `publication_figure_plotter`
+
+```text
+---- Summary ----
+Main function to build the publication figure: baseline OCR, OCR response and haem
+response blocks.
+
+---- Inputs ----
+experiments : dict
+    Experiment dictionaries keyed by experiment name, as defined in DATA_FORMAT.md.
+triplicates : dict
+    Across-run statistics from triplicate_averager.
+config : dict
+    Publication figure settings from custom_config.publication_config_builder.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+tuple
+    (fig, axes); axes holds 'baseline', 'ocr_response', 'haem_response' and
+    'letters' ({letter: panel name}).
+
+---- Globals mutated ----
+None. Stores the t-test table on the returned figure as ``fig.response_tests``.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_baseline_bar_plotter
+_block_gap_calculator
+_condition_indexer
+_experiment_classifier
+_figure_finisher
+_haem_block_plotter
+_haem_row_selector
+_haem_source_finder
+_layout_validator
+_ocr_block_plotter
+_panel_labeller
+_reference_selector
+_response_metric_checker
+```
+
+### PUBLICATION FIGURE SAVER
+
+#### `publication_figure_saver`
+
+```text
+---- Summary ----
+Main function to save a publication or exemplar figure at its exact size, plus the
+t-test table when there is one.
+
+---- Inputs ----
+fig : Figure
+    Figure returned by publication_figure_plotter or exemplar_figure_plotter.
+export_root : Path
+    Results folder.
+config : dict
+    Figure settings dictionary built in custom_config.py.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+list
+    Paths of the files written.
+
+---- Globals mutated ----
+None. Writes the figure under <export_root>/<OUTPUT_SUBFOLDER> and the test table
+under <export_root>/<DATA_SUBFOLDER> (side effects).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+figure_saver
+```
+
 ## `utils_custom/run_namer.py`
 
 Experiment (run) name parsing: conditions, run numbers, groups and hours.
@@ -4472,6 +5970,44 @@ _window_sorter
 condition_grouper
 ```
 
+## `utils_custom/triplicate_exporter.py`
+
+Export of the across-run (triplicate) statistics to an Excel workbook.
+
+### TRIPLICATE EXPORTER
+
+#### `triplicate_exporter`
+
+```text
+---- Summary ----
+Main function to write one worksheet per condition of the across-run statistics to
+an Excel workbook.
+
+---- Inputs ----
+triplicates : dict
+    Across-run statistics per condition, from triplicate_averager (DATA_FORMAT.md).
+output_path : Path
+    Workbook (.xlsx) to write.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+Path
+    The workbook path.
+
+---- Globals mutated ----
+None. Writes the workbook (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_number_writer
+excel_sheet_namer
+finite_float_converter
+```
+
 ## `utils_custom/workbook_helpers.py`
 
 Cell formats and cell writers shared by the workbook exporters.
@@ -4895,6 +6431,92 @@ file_name_sanitiser
 gap_space_calculator
 panel_letter_adder
 watermark_style_builder
+```
+
+## `utils_shared/experiment_processing.py`
+
+Reading and processing of one experiment (everything before the figure and the export).
+
+### MAIN FUNCTIONS
+
+#### `event_settings_merger`
+
+```text
+---- Summary ----
+Main function to copy the label, concentration and ignored flag entered for each
+event onto the experiment, and to move ignored events out of the working event list.
+
+---- Inputs ----
+experiment : dict
+    Experiment dictionary, as defined in DATA_FORMAT.md.
+events : List[dict]
+    Entered events: {datapoint, label, concentration_uM, ignored}.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Updates experiment["metadata"]["events"] in place and adds
+experiment["metadata"]["ignored_events"] (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `experiment_data_processor`
+
+```text
+---- Summary ----
+Main function to read (or take) one experiment and process its data: trim, decompose
+into haems, scale by OD, convert to percentages, choose the plotted sources and
+average around the events. It draws and saves nothing.
+
+---- Inputs ----
+info : dict
+    Per-file information from everything_asker: path, name, trim and ignore times,
+    OD values and events.
+cfg : settings.Config
+    Figure style and settings derived from the answers (config.py).
+fit : Optional[dict]
+    Fit dictionary from import_fit ({haem_list, data}), or None when the haems are
+    not decomposed.
+experiment : Optional[dict]
+    An experiment already read from the file (the experiment browser keeps a copy
+    so the file is not read again). It is processed in place. None reads the file.
+
+---- Globals read ----
+settings.TRANSMISSION_MODE, settings.DEGREE_OF_SCATTER, settings.HAEM_FACTOR,
+settings.DELTA_ABS_WINDOW_SECONDS, settings.PERCENT_AVERAGE_WINDOW_SECONDS.
+
+---- Outputs ----
+dict
+    {experiment, od_available, vo2_source, haem_source}. Prints progress and the
+    reason when a step is skipped (side effect).
+
+---- Globals mutated ----
+None. Processes the experiment dictionary in place (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+event_settings_merger
+experiment_attenuation_adder
+experiment_averages_calculator
+experiment_decomposer
+experiment_normaliser
+experiment_paf_loader
+experiment_trimmer
+percent_converter
+percent_need_checker
+source_chooser
 ```
 
 ## `utils_shared/figure_layout.py`
@@ -6154,6 +7776,9 @@ config : dict
     config.py.
 export_root : Path
     Results folder.
+fig : Optional[Figure]
+    An existing figure to clear and draw in (the experiment browser redraws one
+    window). It is left open. None makes a new figure.
 
 ---- Globals read ----
 config keys FIGURE_SIZE, FIGURE_DPI, TITLE_STYLE, LAYOUT_PAD_PT, FIT_MARGINS,
@@ -6162,7 +7787,8 @@ settings.
 
 ---- Outputs ----
 Tuple[Figure, List[Axes]]
-    The figure (already closed unless SHOW_INDIVIDUAL_FIGURES is set) and its axes.
+    The figure (already closed unless SHOW_INDIVIDUAL_FIGURES is set or a figure was
+    given) and its axes.
 
 ---- Globals mutated ----
 None. Writes <export_root>/<name>/<name>.svg and .png and prints a message (side
@@ -7562,6 +9188,34 @@ _input_reader
 _question_printer
 ```
 
+#### `numbering_getter`
+
+```text
+---- Summary ----
+Main function to read the current number at a depth, so it can be restored with
+numbering_setter after questions are asked again.
+
+---- Inputs ----
+depth : int
+    Numbering depth to read (0 = the section number).
+
+---- Globals read ----
+_counters (module state).
+
+---- Outputs ----
+int
+    Current number at that depth.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
 #### `numbering_restarter`
 
 ```text
@@ -8817,12 +10471,8 @@ None.
 averaging_asker
 decomposition_asker
 event_asker
-info_printer
-od_asker
-progress_clearer
-progress_printer
-saved_settings_reader
-yes_no_asker
+od_scaling_asker
+saved_values_reader
 ```
 
 #### `averaging_asker`
@@ -9159,6 +10809,44 @@ number_asker
 numbering_restarter
 ```
 
+#### `od_scaling_asker`
+
+```text
+---- Summary ----
+Main function to ask whether to scale by OD and, if so, the OD, volume and dilution
+factor of every file, offering the stored values.
+
+---- Inputs ----
+summaries : List[dict]
+    File summaries (DATA_FORMAT.md).
+answers : dict
+    Answers dictionary the values are stored in.
+defaults : dict
+    Default answers (normalise_od).
+saved : dict
+    {file name: values read from its workbook} (saved_values_reader).
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+Dict[str, dict]
+    {file name: {'OD', 'volume', 'dilution_factor'}}; the dictionaries are empty
+    when not scaling by OD.
+
+---- Globals mutated ----
+None. Stores normalise_od in ``answers`` and reads from and prints to the terminal
+(side effects).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+info_printer
+od_asker
+yes_no_asker
+```
+
 #### `paf_finder`
 
 ```text
@@ -9226,6 +10914,39 @@ number_asker
 ocr_option_builder
 size_asker
 yes_no_asker
+```
+
+#### `saved_values_reader`
+
+```text
+---- Summary ----
+Main function to read the OD and event values saved in each experiment's workbook
+from an earlier run, so they can be offered as defaults.
+
+---- Inputs ----
+summaries : List[dict]
+    File summaries (DATA_FORMAT.md).
+export_root : Path
+    Results folder, where the saved workbooks are looked for.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+Dict[str, dict]
+    {file name: values read from its workbook, or None when there is none}.
+
+---- Globals mutated ----
+None. Prints progress and a note when earlier values are found (side effects).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+info_printer
+progress_clearer
+progress_printer
+saved_settings_reader
 ```
 
 #### `size_asker`
@@ -9342,4 +11063,714 @@ t_new = t - start_time; rows kept where start_time <= t <= end_time.
 
 ---- Helpers ----
 None.
+```
+
+## `utils_viewer/viewer_preview.py`
+
+Processing and drawing of one experiment as a preview in the plot window.
+
+### CLASSES
+
+#### `ViewerSession`
+
+```text
+---- Summary ----
+Everything the experiment browser keeps between steps: the files, the plot window
+and the recently read experiments.
+Detailed structure can be found in DATA_FORMAT.md.
+```
+
+### PREVIEW HELPERS
+
+#### `_info_builder`
+
+```text
+---- Summary ----
+Helper function to build the per-file information dictionary that
+experiment_data_processor needs, from the answers given so far.
+
+---- Inputs ----
+summary : dict
+    File summary (DATA_FORMAT.md).
+limits : dict
+    {file name: {trim_start, trim_end, ignore_start, ignore_end}} in minutes; may
+    lack the file.
+details : dict
+    {file name: {OD, volume, dilution_factor, events}}; may lack the file.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+dict
+    Per-file information (as built in everything_asker).
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `_overlay_drawer`
+
+```text
+---- Summary ----
+Helper function to shade regions of the time axis on every panel of the preview.
+
+---- Inputs ----
+fig : Figure
+    The preview figure.
+axes : list
+    Panels of the preview, top to bottom.
+regions : list
+    [(start_min, end_min, kind)] with kind 'trim' (grey hatched) or 'ignore'
+    (amber).
+note : str
+    Short explanation of the shading, written in the corner of the figure; may be
+    empty.
+
+---- Globals read ----
+IGNORE_COLOUR, TRIM_COLOUR (module constants).
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Adds shaded regions and the note to the figure (side effects).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `_loaded_experiment_getter`
+
+```text
+---- Summary ----
+Helper function to give a fresh copy of an experiment read from its file. The file
+is read once and kept for the next previews (the last few files only), and read
+again when the spectra of a dataset are needed that were not read before.
+
+---- Inputs ----
+session : ViewerSession
+    The browser session holding the cache.
+summary : dict
+    File summary (DATA_FORMAT.md).
+dataset : Optional[str]
+    Spectral dataset needed for the haem decomposition, or None for no spectra.
+
+---- Globals read ----
+MAX_CACHED_FILES (module constant).
+
+---- Outputs ----
+dict
+    A deep copy of the experiment dictionary, safe to trim and process in place.
+
+---- Globals mutated ----
+None. Updates the cache of the session (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+experiment_paf_loader
+```
+
+### MAIN FUNCTIONS
+
+#### `preview_drawer`
+
+```text
+---- Summary ----
+Main function to process one file with the answers given so far and draw it in the
+plot window. Problems are reported, never raised, so the questions carry on.
+
+---- Inputs ----
+session : ViewerSession
+    The browser session (files, window, cache, current file).
+answers : dict
+    Answers so far; missing keys come from config.DEFAULT_ANSWERS.
+limits : dict
+    {file name: {trim_start, trim_end, ignore_start, ignore_end}} in minutes.
+fit : Optional[dict]
+    Fit dictionary from fit_importer, or None.
+details : dict
+    {file name: {OD, volume, dilution_factor, events}}.
+show_trim : bool
+    True to draw the whole recording and shade the part that would be trimmed, so
+    the trim limits can be judged. False draws the trimmed data.
+show_ignored : bool
+    True to shade the ignored start and end in amber.
+name : Optional[str]
+    File to draw; None draws the current file of the session.
+
+---- Globals read ----
+settings.Config; PREVIEW_DPI (module constant).
+
+---- Outputs ----
+bool
+    True when the preview was drawn, False when it could not be.
+
+---- Globals mutated ----
+None. Draws in the plot window and prints warnings (side effects).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_info_builder
+_loaded_experiment_getter
+_overlay_drawer
+```
+
+## `utils_viewer/viewer_stages.py`
+
+The steps of the experiment browser: ask, redraw the plot window, then accept or repeat.
+
+### STAGE HELPERS
+
+#### `_answers_previewer`
+
+```text
+---- Summary ----
+Helper function to build the answers used to draw a preview: the raw data while
+browsing and trimming, and the analysis chosen so far afterwards.
+
+---- Inputs ----
+answers : dict
+    Answers given so far.
+fit : Optional[dict]
+    Fit dictionary, used to list the haems to show.
+kind : str
+    'raw' (O2 and the raw OCR only), 'analysis' (also the haems and the OD scaling
+    chosen so far, in a wide preview) or 'final' (exactly as the figure will be).
+
+---- Globals read ----
+BROWSING_ANSWERS (module constant).
+
+---- Outputs ----
+dict
+    A copy of the answers with the preview settings; ``answers`` is not changed.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `_file_chooser`
+
+```text
+---- Summary ----
+Helper function to ask which file to look at and make it the current one.
+
+---- Inputs ----
+session : ViewerSession
+    The browser session; its current file is changed.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Sets session.current and reads from and prints to the terminal (side
+effects).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+choice_asker
+```
+
+#### `_limits_lister`
+
+```text
+---- Summary ----
+Helper function to print the trim and ignore limits of every file in one list.
+
+---- Inputs ----
+summaries : List[dict]
+    File summaries (DATA_FORMAT.md).
+limits : Dict[str, dict]
+    {file name: {trim_start, trim_end, ignore_start, ignore_end}} in minutes.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Prints to the terminal (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+info_printer
+```
+
+#### `_review_asker`
+
+```text
+---- Summary ----
+Helper function to ask whether the user accepts what the plot window shows. The user
+can also look at another file, which redraws the window, before deciding.
+
+---- Inputs ----
+session : ViewerSession
+    The browser session; its current file may be changed.
+question : str
+    The accept question, for example 'Do you accept these limits?'.
+change_label : str
+    Label of the answer that asks the questions of the step again.
+redraw : Callable[[], bool]
+    Function that draws the preview of the current file.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+bool
+    True when accepted, False when the user wants to answer the step again.
+
+---- Globals mutated ----
+None. Reads from and prints to the terminal and redraws the window (side effects).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_file_chooser
+choice_asker
+```
+
+### MAIN FUNCTIONS
+
+#### `analysis_stage_runner`
+
+```text
+---- Summary ----
+Main function to ask the analysis questions (haem decomposition, OD scaling, event
+averaging and event labels) one at a time, redrawing the plot window after each so
+the result can be accepted or asked again.
+
+---- Inputs ----
+session : ViewerSession
+    The browser session.
+answers : dict
+    Answers dictionary the values are stored in.
+defaults : dict
+    Default answers offered by the questions.
+limits : Dict[str, dict]
+    Trim and ignore limits of every file (trim_asker).
+fits_folder : Path
+    Folder holding the fit .csv files.
+details_before : Optional[Dict[str, dict]]
+    OD values and events from an earlier pass, offered as defaults when the step is
+    asked again.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+Tuple[Optional[dict], Dict[str, dict]]
+    (fit, details) exactly as analysis_asker returns them.
+
+---- Globals mutated ----
+None. Stores the answers in ``answers`` (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_answers_previewer
+_review_asker
+averaging_asker
+decomposition_asker
+event_asker
+od_scaling_asker
+preview_drawer
+saved_values_reader
+```
+
+#### `browser_stage_runner`
+
+```text
+---- Summary ----
+Main function to let the user look through the files in the plot window (the set and
+measured O2 and the OCR, with the events) before answering any questions about
+them.
+
+---- Inputs ----
+session : ViewerSession
+    The browser session; its current file is changed.
+answers : dict
+    Answers so far, used for the figure style of the preview.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Reads from and prints to the terminal and draws the plot window (side
+effects).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_answers_previewer
+_file_chooser
+choice_asker
+info_printer
+preview_drawer
+```
+
+#### `plots_stage_runner`
+
+```text
+---- Summary ----
+Main function to ask what the individual figures show and how they are sized, then
+draw the figure as it will be saved and ask whether to accept it.
+
+---- Inputs ----
+session : ViewerSession
+    The browser session.
+answers : dict
+    Answers dictionary the values are stored in.
+defaults : dict
+    Default answers offered by the questions.
+limits : Dict[str, dict]
+    Trim and ignore limits of every file.
+fit : Optional[dict]
+    Fit dictionary, or None.
+details : Dict[str, dict]
+    OD values and events of every file.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+bool
+    True when at least one panel is plotted (as plot_asker returns it).
+
+---- Globals mutated ----
+None. Stores the answers in ``answers`` (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_answers_previewer
+_review_asker
+plot_asker
+preview_drawer
+```
+
+#### `trim_stage_runner`
+
+```text
+---- Summary ----
+Main function to ask the trim and ignore questions, shade the trimmed and ignored
+parts in the plot window, and ask whether to accept them.
+
+---- Inputs ----
+session : ViewerSession
+    The browser session.
+answers : dict
+    Answers so far, used for the figure style of the preview.
+remembered : Dict[str, dict]
+    {file name: {trim_start, trim_end, ignore_start, ignore_end}} offered as the
+    defaults (from the last run, or from the previous attempt).
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+Dict[str, dict]
+    The limits of every file, exactly as trim_asker returns them.
+
+---- Globals mutated ----
+None. Reads from and prints to the terminal and draws the plot window (side
+effects).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_answers_previewer
+_limits_lister
+_review_asker
+preview_drawer
+trim_asker
+```
+
+#### `viewer_asker`
+
+```text
+---- Summary ----
+Main function to ask the questions of the experiment browser: the file browser,
+trimming and ignoring, the analysis and the individual figures. The plot window is
+redrawn after each answer, and at the end any step can be gone back to.
+
+---- Inputs ----
+summaries : List[dict]
+    File summaries (DATA_FORMAT.md).
+answers : dict
+    Answers dictionary the values are stored in.
+defaults : dict
+    Default answers offered by the questions.
+remembered : Dict[str, dict]
+    {file name: limits} from the last run.
+fits_folder : Path
+    Folder holding the fit .csv files.
+export_root : Path
+    Results folder.
+
+---- Globals read ----
+PREVIEW_FILE, STAGE_TITLES (module constants).
+
+---- Outputs ----
+Tuple[Dict[str, dict], Optional[dict], Dict[str, dict], bool]
+    (limits, fit, details, plotted) as the same questions return them when they are
+    asked without the browser.
+
+---- Globals mutated ----
+None. Stores the answers in ``answers``, reads from and prints to the terminal,
+draws and closes the plot window (side effects).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+analysis_stage_runner
+browser_stage_runner
+choice_asker
+heading_printer
+numbering_getter
+numbering_setter
+plots_stage_runner
+section_starter
+trim_stage_runner
+```
+
+## `utils_viewer/viewer_window.py`
+
+The plot window of the experiment browser: one window that is redrawn after each answer.
+
+### CLASSES
+
+#### `ViewerWindow`
+
+```text
+---- Summary ----
+One plot window that shows the preview of the current step. When no plot window can
+be opened (no display, or no GUI library) the preview is saved to a picture file
+instead, which is opened in the default picture viewer.
+
+---- Attributes ----
+preview_path : Path
+    Picture file used when no plot window can be opened.
+is_window : bool
+    True when previews appear in a plot window, False when they go to the file.
+backend_name : Optional[str]
+    Name of the matplotlib backend of the plot window, None for the file.
+fig : Optional[Figure]
+    The figure being redrawn, None before the first preview.
+
+---- Globals read ----
+BACKENDS_MAC, BACKENDS_OTHER, PREVIEW_DPI, WINDOW_TITLE (module constants).
+
+---- Methods ----
+__init__
+_backend_starter
+_file_opener
+figure_getter
+window_closer
+window_refresher
+```
+
+##### `__init__`
+
+```text
+---- Summary ----
+Method to set up the window object without opening anything yet.
+
+---- Inputs ----
+preview_path : Path
+    Picture file used when no plot window can be opened.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Sets the attributes on the instance.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+##### `_backend_starter`
+
+```text
+---- Summary ----
+Method to switch matplotlib to the first interactive backend that works, once.
+The program normally runs on the non-interactive Agg backend.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+BACKENDS_MAC, BACKENDS_OTHER (module constants).
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Switches the matplotlib backend and sets is_window and backend_name
+(side effects).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+##### `_file_opener`
+
+```text
+---- Summary ----
+Method to open the preview picture in the default picture viewer (once), so the
+preview can be seen without a plot window.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Starts the picture viewer; a failure to start it is ignored (side
+effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+##### `figure_getter`
+
+```text
+---- Summary ----
+Method to give the figure to draw the next preview in. The plot window is opened
+on the first call and opened again if the user closed it.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+PREVIEW_DPI, WINDOW_TITLE (module constants).
+
+---- Outputs ----
+Figure
+    The figure; the caller clears and redraws it.
+
+---- Globals mutated ----
+None. May open the plot window and prints a note when it falls back to a picture
+file (side effects).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_backend_starter
+```
+
+##### `window_closer`
+
+```text
+---- Summary ----
+Method to close the plot window and put matplotlib back on the Agg backend, so
+the rest of the run draws and saves figures as it always did.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Closes all figures and switches the matplotlib backend (side effects).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+##### `window_refresher`
+
+```text
+---- Summary ----
+Method to show the figure that was just drawn: repaint the plot window, or save
+the picture file and tell the user where it is.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+PREVIEW_DPI (module constant).
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Repaints the window or writes the preview picture (side effects).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_file_opener
 ```

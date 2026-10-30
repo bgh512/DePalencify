@@ -143,6 +143,8 @@ Saved to `last_answers.json` next to `main.py` and offered as the defaults on th
 | `'answers'` | dict | | | Terminal answers |
 | `'files'` | dict | | min | `{file name: {'trim_start', 'trim_end', 'ignore_start', 'ignore_end'}}`; trim times are on the original recording, ignore times count from the new 0 after trimming |
 
+The terminal answers include `'use_viewer'` (bool): whether the experiment browser is used.
+
 ### 1.2 Dataclasses
 
 #### `Spectra`
@@ -165,6 +167,18 @@ Defined in `utils_shared/paf_reader.py`. Created by `spectra_parser`, used by `r
 | `params` | dict | | | `{}` | Acquisition parameters found in the record |
 | `trailer` | list | | | `[]` | Text tokens after the data block |
 | `checks` | dict | | | `{}` | Warnings raised while parsing |
+
+#### `ViewerSession`
+
+Defined in `utils_viewer/viewer_preview.py`. Created by `viewer_asker`, used by the stage runners and `preview_drawer`.
+
+| Field | Type | Shape | Units | Default | Description |
+|---|---|---|---|---|---|
+| `summaries` | List[dict] | (n_files,) | | | The `experiment_summary` of each file |
+| `export_root` | Path | | | | Results folder |
+| `window` | ViewerWindow | | | | The plot window (or the preview picture file) |
+| `current` | int | | | `0` | Index of the file being looked at |
+| `cache` | OrderedDict | | | empty | `{file name: {'experiment': experiment}}` of the last 3 files read; each preview works on a deep copy |
 
 ### 1.3 Arrays
 
@@ -255,6 +269,15 @@ The `Averages` sheet has one row per window: `Average`, `Start time (min)`, `End
 | Location and name | `last_answers.json` next to `main.py` (not committed) |
 
 Structure: see `last_answers` in section 1.1.
+
+#### `preview picture`
+
+| Property | Value |
+|---|---|
+| File type | `.png` |
+| Location and name | `DePalencify_preview.png` in the system temporary folder |
+
+Written, and opened in the default picture viewer, only when the experiment browser cannot open a plot window. Overwritten by each preview.
 
 #### `log file`
 

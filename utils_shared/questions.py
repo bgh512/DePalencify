@@ -535,6 +535,37 @@ def number_asker(question: str,
         return value
 
 
+# ---- numbering_getter ----------------------------------------------------------------
+def numbering_getter(depth: int) -> int:
+    """
+    ---- Summary ----
+    Main function to read the current number at a depth, so it can be restored with
+    numbering_setter after questions are asked again.
+
+    ---- Inputs ----
+    depth : int
+        Numbering depth to read (0 = the section number).
+
+    ---- Globals read ----
+    _counters (module state).
+
+    ---- Outputs ----
+    int
+        Current number at that depth.
+
+    ---- Globals mutated ----
+    None.
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    None.
+    """
+
+    return _counters[depth]
+
+
 # ---- numbering_restarter -------------------------------------------------------------
 def numbering_restarter(depth: int) -> None:
     """
