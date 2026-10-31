@@ -9,6 +9,9 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Optional
 
+# ---- LOCAL IMPORTS -------------------------------------------------------------------
+from utils_shared.output_capture import captured_buffer_getter
+
 
 # ---- _Tee ----------------------------------------------------------------------------
 class _Tee:
@@ -156,8 +159,9 @@ class _Tee:
     def write(self, text: str) -> int:
         """
         ---- Summary ----
-        Method to write text to every stream and flush it. The name is fixed by the
-        file-like protocol.
+        Method to write text to every stream and flush it, unless the current thread is
+        capturing its output (see output_capture), in which case it is kept by the
+        capture. The name is fixed by the file-like protocol.
 
         ---- Inputs ----
         text : str
@@ -177,9 +181,12 @@ class _Tee:
         None.
 
         ---- Helpers ----
-        None.
+        captured_buffer_getter
         """
 
+        captured = captured_buffer_getter()
+        if captured is not None:  # a thread that is capturing its output
+            return captured.write(text)
         for stream in self.streams:
             stream.write(text)
             stream.flush()

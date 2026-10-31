@@ -1,28 +1,27 @@
 """
-Processing and drawing of one experiment as a preview in the plot window.
+Processing and drawing of one experiment as a preview figure.
 """
 
 # ---- STANDARD IMPORTS ----------------------------------------------------------------
-import contextlib
 import copy
-import io
 from collections import OrderedDict
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import List, Optional
+from typing import Any, List, Optional, Tuple
 
 # ---- 3RD PARTY IMPORTS ---------------------------------------------------------------
 import matplotlib.pyplot as plt
+from matplotlib.figure import Figure
 
 # ---- LOCAL IMPORTS -------------------------------------------------------------------
 import config as settings
 from utils_shared.experiment_processing import experiment_data_processor
 from utils_shared.individual_experiment_plotter import experiment_plotter
 from utils_shared.paf_reader import experiment_paf_loader
-from utils_viewer.viewer_window import PREVIEW_DPI, ViewerWindow
 
 
 # ---- CONSTANTS -----------------------------------------------------------------------
+PREVIEW_DPI = 200
 MAX_CACHED_FILES = 3
 # Size of the preview while browsing, trimming and checking the analysis (the journal
 # size is used once the journal has been chosen).
@@ -35,19 +34,37 @@ TRIM_COLOUR = '0.45'
 IGNORE_COLOUR = '#e8a317'
 
 
+# ---- PreviewSpec ---------------------------------------------------------------------
+@dataclass
+class PreviewSpec:
+    """
+    ---- Summary ----
+    The settings a preview is drawn with: the answers given so far. Every file is drawn
+    with the same spec, so the files can be compared.
+    Detailed structure can be found in DATA_FORMAT.md.
+    """
+
+    answers: dict
+    limits: dict
+    fit: Optional[dict]
+    details: dict
+    show_trim: bool = False
+    show_ignored: bool = True
+
+
 # ---- ViewerSession -------------------------------------------------------------------
 @dataclass
 class ViewerSession:
     """
     ---- Summary ----
-    Everything the experiment browser keeps between steps: the files, the plot window
-    and the recently read experiments.
+    Everything the experiment browser keeps between steps: the files, the window and the
+    recently read experiments.
     Detailed structure can be found in DATA_FORMAT.md.
     """
 
     summaries: List[dict]
     export_root: Path
-    window: ViewerWindow
+    window: Any
     current: int = 0
     cache: OrderedDict = field(default_factory=OrderedDict)
 
@@ -100,61 +117,6 @@ def _info_builder(summary: dict, limits: dict, details: dict) -> dict:
             }
     info.update(details.get(name, {}))
     return info
-
-
-# ---- _overlay_drawer -----------------------------------------------------------------
-def _overlay_drawer(fig: object,
-                    axes: list,
-                    regions: list,
-                    note: str,
-                    ) -> None:
-    """
-    ---- Summary ----
-    Helper function to shade regions of the time axis on every panel of the preview.
-
-    ---- Inputs ----
-    fig : Figure
-        The preview figure.
-    axes : list
-        Panels of the preview, top to bottom.
-    regions : list
-        [(start_min, end_min, kind)] with kind 'trim' (grey hatched) or 'ignore'
-        (amber).
-    note : str
-        Short explanation of the shading, written in the corner of the figure; may be
-        empty.
-
-    ---- Globals read ----
-    IGNORE_COLOUR, TRIM_COLOUR (module constants).
-
-    ---- Outputs ----
-    None
-        Nothing.
-
-    ---- Globals mutated ----
-    None. Adds shaded regions and the note to the figure (side effects).
-
-    ---- Equations ----
-    None.
-
-    ---- Helpers ----
-    None.
-    """
-
-    for start, end, kind in regions:
-        if end <= start:
-            continue
-        for ax in axes:
-            if kind == 'trim':
-                ax.axvspan(start, end, facecolor=TRIM_COLOUR, alpha=0.25, hatch='///',
-                           edgecolor=TRIM_COLOUR, linewidth=0, zorder=1)
-            else:
-                ax.axvspan(start, end, facecolor=IGNORE_COLOUR, alpha=0.22,
-                           linewidth=0, zorder=1)
-    if note:
-        mark = fig.text(0.995, 0.005, note, ha='right', va='bottom', fontsize=6,
-                        color='0.35', alpha=0.9)
-        mark.set_in_layout(False)
 
 
 # ---- _loaded_experiment_getter -------------------------------------------------------
@@ -213,6 +175,61 @@ def _loaded_experiment_getter(session: ViewerSession,
     return copy.deepcopy(entry['experiment'])
 
 
+# ---- _overlay_drawer -----------------------------------------------------------------
+def _overlay_drawer(fig: Figure,
+                    axes: list,
+                    regions: list,
+                    note: str,
+                    ) -> None:
+    """
+    ---- Summary ----
+    Helper function to shade regions of the time axis on every panel of the preview.
+
+    ---- Inputs ----
+    fig : Figure
+        The preview figure.
+    axes : list
+        Panels of the preview, top to bottom.
+    regions : list
+        [(start_min, end_min, kind)] with kind 'trim' (grey hatched) or 'ignore'
+        (amber).
+    note : str
+        Short explanation of the shading, written in the corner of the figure; may be
+        empty.
+
+    ---- Globals read ----
+    IGNORE_COLOUR, TRIM_COLOUR (module constants).
+
+    ---- Outputs ----
+    None
+        Nothing.
+
+    ---- Globals mutated ----
+    None. Adds shaded regions and the note to the figure (side effects).
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    None.
+    """
+
+    for start, end, kind in regions:
+        if end <= start:
+            continue
+        for ax in axes:
+            if kind == 'trim':
+                ax.axvspan(start, end, facecolor=TRIM_COLOUR, alpha=0.25, hatch='///',
+                           edgecolor=TRIM_COLOUR, linewidth=0, zorder=1)
+            else:
+                ax.axvspan(start, end, facecolor=IGNORE_COLOUR, alpha=0.22,
+                           linewidth=0, zorder=1)
+    if note:
+        mark = fig.text(0.995, 0.005, note, ha='right', va='bottom', fontsize=6,
+                        color='0.35', alpha=0.9)
+        mark.set_in_layout(False)
+
+
 # ---- MAIN FUNCTIONS ------------------------------------------------------------------
 
 
@@ -228,8 +245,10 @@ def preview_drawer(session: ViewerSession,
                    ) -> bool:
     """
     ---- Summary ----
-    Main function to process one file with the answers given so far and draw it in the
-    plot window. Problems are reported, never raised, so the questions carry on.
+    Main function to show the answers given so far in the window. A window with its own
+    controls (the experiment browser window) is given the settings and draws every file
+    the user looks at with them; otherwise the current file is drawn and saved as a
+    picture. Problems are reported, never raised, so the questions carry on.
 
     ---- Inputs ----
     session : ViewerSession
@@ -248,17 +267,82 @@ def preview_drawer(session: ViewerSession,
     show_ignored : bool
         True to shade the ignored start and end in amber.
     name : Optional[str]
-        File to draw; None draws the current file of the session.
+        File to show; None keeps the file being looked at.
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    bool
+        True when the preview was drawn (or handed to the window), False when it could
+        not be.
+
+    ---- Globals mutated ----
+    None. Draws in the window or writes the preview picture (side effects).
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    preview_figure_builder
+    """
+
+    # ---- 1 Collect the settings ------------------------------------------------------
+    spec = PreviewSpec(answers=dict(answers),
+                       limits=copy.deepcopy(limits),
+                       fit=fit,
+                       details=copy.deepcopy(details),
+                       show_trim=show_trim,
+                       show_ignored=show_ignored,
+                       )
+
+    # ---- 2 Hand them to the window or draw one picture -------------------------------
+    if session.window.is_interactive:
+        session.window.spec_publisher(spec, name)
+        return True
+    figure, notes = preview_figure_builder(
+        session,
+        spec,
+        name or session.summaries[session.current]['name'],
+    )
+    if notes:
+        print('\n'.join(f'  {line}' for line in notes.splitlines()))
+    if figure is None:
+        return False
+    session.window.figure_shower(figure)
+    return True
+
+
+# ---- preview_figure_builder ----------------------------------------------------------
+def preview_figure_builder(session: ViewerSession,
+                           spec: PreviewSpec,
+                           name: str,
+                           ) -> Tuple[Optional[Figure], str]:
+    """
+    ---- Summary ----
+    Main function to process one file with the answers of a spec and draw it in a new
+    figure. Problems are reported, never raised.
+
+    ---- Inputs ----
+    session : ViewerSession
+        The browser session (files, window, cache).
+    spec : PreviewSpec
+        The settings to draw with.
+    name : str
+        Name of the file to draw.
 
     ---- Globals read ----
     settings.Config; PREVIEW_DPI (module constant).
 
     ---- Outputs ----
-    bool
-        True when the preview was drawn, False when it could not be.
+    Tuple[Optional[Figure], str]
+        (figure, notes). The figure is None when the preview could not be drawn, and
+        the notes then say why. Otherwise the notes are the warnings of the processing
+        (a skipped step, a missing OD), one per line, and may be empty.
 
     ---- Globals mutated ----
-    None. Draws in the plot window and prints warnings (side effects).
+    None. Sets the matplotlib rcParams of the figure style (side effect). Nothing is
+    printed; the caller decides where the notes go.
 
     ---- Equations ----
     None.
@@ -270,85 +354,71 @@ def preview_drawer(session: ViewerSession,
     """
 
     # ---- 1 Set up the file and the settings ------------------------------------------
-    summary = (session.summaries[session.current]
-               if name is None
-               else next(s for s in session.summaries if s['name'] == name)
-               )
-    own = limits.get(summary['name'], {})
-    shown_limits = {summary['name']: {} if show_trim else own}
-    info = _info_builder(summary, shown_limits, details)
+    summary = next(s for s in session.summaries if s['name'] == name)
+    own = spec.limits.get(name, {})
+    info = _info_builder(summary, {name: {} if spec.show_trim else own}, spec.details)
     preview_answers = dict(settings.DEFAULT_ANSWERS,
-                           **dict(answers, export_spectra=False),
+                           **dict(spec.answers, export_spectra=False),
                            )
     cfg = settings.Config(preview_answers)
     plt.rcParams.update(cfg.RC_PARAMS)
 
-    # ---- 2 Process the data ----------------------------------------------------------
-    needs_dataset = preview_answers['decompose'] and fit is not None
-    buffer = io.StringIO()
+    # ---- 2 Process the data and draw the figure --------------------------------------
+    needs_dataset = preview_answers['decompose'] and spec.fit is not None
+    fig = Figure(dpi=PREVIEW_DPI)
     try:
-        experiment = _loaded_experiment_getter(session,
-                                               summary,
-                                               preview_answers['decomposition_dataset']
-                                               if needs_dataset
-                                               else None,
-                                               )
-        with contextlib.redirect_stdout(buffer):
-            processed = experiment_data_processor(info, cfg, fit, experiment)
-    except Exception as exc:  # a preview problem must never stop the questions
-        print(f"  Preview not drawn for {summary['name']}: {type(exc).__name__}: {exc}")
-        return False
-    for line in buffer.getvalue().splitlines():
-        if any(word in line for word in ('Warning', 'skipped', 'Not ')):
-            print(line)
-
-    # ---- 3 Draw the figure -----------------------------------------------------------
-    experiment = processed['experiment']
-    haem_panels = preview_answers['plot_haems'] and 'haem_conc' in experiment
-    plot_config = cfg.plot_config_builder(processed['vo2_source'],
-                                          processed['haem_source']
-                                          if haem_panels
-                                          else None,
-                                          info['ignore_start'],
-                                          info['ignore_end'],
-                                          )
-    plot_config.update({'SAVE_FIGURES': False,
-                        'SHOW_INDIVIDUAL_FIGURES': False,
-                        'FIGURE_DPI': PREVIEW_DPI,
-                        })
-    try:
-        fig = session.window.figure_getter()
-        with contextlib.redirect_stdout(io.StringIO()):
+        with session.window.output_capturer() as buffer:
+            experiment = _loaded_experiment_getter(session,
+                                                   summary,
+                                                   preview_answers[
+                                                       'decomposition_dataset']
+                                                   if needs_dataset
+                                                   else None,
+                                                   )
+            processed = experiment_data_processor(info, cfg, spec.fit, experiment)
+            experiment = processed['experiment']
+            haem_panels = preview_answers['plot_haems'] and 'haem_conc' in experiment
+            plot_config = cfg.plot_config_builder(processed['vo2_source'],
+                                                  processed['haem_source']
+                                                  if haem_panels
+                                                  else None,
+                                                  info['ignore_start'],
+                                                  info['ignore_end'],
+                                                  )
+            plot_config.update({'SAVE_FIGURES': False,
+                                'SHOW_INDIVIDUAL_FIGURES': False,
+                                'FIGURE_DPI': PREVIEW_DPI,
+                                })
             _, axes = experiment_plotter(experiment,
                                          plot_config,
                                          session.export_root,
                                          fig=fig,
                                          )
-    except Exception as exc:
-        print(f"  Preview not drawn for {summary['name']}: {type(exc).__name__}: {exc}")
-        return False
+    except Exception as exc:  # a preview problem must never stop the questions
+        return None, f'Preview not drawn for {name}: {type(exc).__name__}: {exc}'
+    notes = '\n'.join(line.strip()
+                      for line in buffer.getvalue().splitlines()
+                      if any(word in line for word in ('Warning', 'skipped', 'Not '))
+                      )
 
-    # ---- 4 Shade the trimmed and ignored parts ---------------------------------------
+    # ---- 3 Shade the trimmed and ignored parts ---------------------------------------
     regions = []
     duration = float(experiment['CcO2'].iloc[-1, 0])
-    start = (own.get('trim_start') or 0.0) if show_trim else 0.0
+    start = (own.get('trim_start') or 0.0) if spec.show_trim else 0.0
     end = ((own.get('trim_end') or summary['duration_min'])
-           if show_trim
+           if spec.show_trim
            else duration
            )
-    if show_trim:
+    if spec.show_trim:
         regions += [(0.0, start, 'trim'), (end, summary['duration_min'], 'trim')]
-    if show_ignored:
+    if spec.show_ignored:
         regions += [(start, start + (own.get('ignore_start') or 0.0), 'ignore'),
                     (end - (own.get('ignore_end') or 0.0), end, 'ignore'),
                     ]
     note = ''
-    if show_trim:
+    if spec.show_trim:
         note = 'grey hatched = trimmed away, amber = ignored in calculations'
-    elif show_ignored and any(r[2] == 'ignore' and r[1] > r[0] for r in regions):
+    elif spec.show_ignored and any(r[2] == 'ignore' and r[1] > r[0] for r in regions):
         note = 'amber = ignored in calculations'
     _overlay_drawer(fig, axes, regions, note)
-
-    # ---- 5 Show it -------------------------------------------------------------------
-    session.window.window_refresher()
-    return True
+    return fig, notes

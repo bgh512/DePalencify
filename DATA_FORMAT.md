@@ -168,15 +168,28 @@ Defined in `utils_shared/paf_reader.py`. Created by `spectra_parser`, used by `r
 | `trailer` | list | | | `[]` | Text tokens after the data block |
 | `checks` | dict | | | `{}` | Warnings raised while parsing |
 
+#### `PreviewSpec`
+
+Defined in `utils_viewer/viewer_preview.py`. Created by `preview_drawer`; every file is drawn with the same spec.
+
+| Field | Type | Shape | Units | Default | Description |
+|---|---|---|---|---|---|
+| `answers` | dict | | | | Answers so far (missing keys come from `config.DEFAULT_ANSWERS`) |
+| `limits` | dict | | min | | `{file name: {trim_start, trim_end, ignore_start, ignore_end}}` |
+| `fit` | Optional[dict] | | | | Fit dictionary from `fit_importer`, or None |
+| `details` | dict | | | | `{file name: {OD, volume, dilution_factor, events}}` |
+| `show_trim` | bool | | | `False` | Draw the whole recording and shade the trimmed part |
+| `show_ignored` | bool | | | `True` | Shade the ignored start and end |
+
 #### `ViewerSession`
 
-Defined in `utils_viewer/viewer_preview.py`. Created by `viewer_asker`, used by the stage runners and `preview_drawer`.
+Defined in `utils_viewer/viewer_preview.py`. Created by `viewer_asker`, used by the stage runners, `preview_drawer` and the preview thread.
 
 | Field | Type | Shape | Units | Default | Description |
 |---|---|---|---|---|---|
 | `summaries` | List[dict] | (n_files,) | | | The `experiment_summary` of each file |
 | `export_root` | Path | | | | Results folder |
-| `window` | ViewerWindow | | | | The plot window (or the preview picture file) |
+| `window` | ViewerGui or PictureWindow | | | | The browser window, or the preview picture file when no window can open |
 | `current` | int | | | `0` | Index of the file being looked at |
 | `cache` | OrderedDict | | | empty | `{file name: {'experiment': experiment}}` of the last 3 files read; each preview works on a deep copy |
 
@@ -277,7 +290,7 @@ Structure: see `last_answers` in section 1.1.
 | File type | `.png` |
 | Location and name | `DePalencify_preview.png` in the system temporary folder |
 
-Written, and opened in the default picture viewer, only when the experiment browser cannot open a plot window. Overwritten by each preview.
+Written, and opened in the default picture viewer, only when the experiment browser window cannot open. Overwritten by each preview.
 
 #### `log file`
 

@@ -18,6 +18,7 @@ from utils_shared.questions import (choice_asker,
 from utils_shared.survey import (averaging_asker,
                                  decomposition_asker,
                                  event_asker,
+                                 file_focus_setter,
                                  od_scaling_asker,
                                  plot_asker,
                                  saved_values_reader,
@@ -27,7 +28,8 @@ from utils_viewer.viewer_preview import (BROWSING_ANSWERS,
                                          preview_drawer,
                                          ViewerSession,
                                          )
-from utils_viewer.viewer_window import ViewerWindow
+from utils_viewer.viewer_gui import active_gui_getter
+from utils_viewer.viewer_window import PictureWindow
 
 
 # ---- CONSTANTS -----------------------------------------------------------------------
@@ -185,8 +187,9 @@ def _review_asker(session: ViewerSession,
                   ) -> bool:
     """
     ---- Summary ----
-    Helper function to ask whether the user accepts what the plot window shows. The user
-    can also look at another file, which redraws the window, before deciding.
+    Helper function to ask whether the user accepts what the plot window shows. In the
+    browser window the user flicks through the files while the question waits; with the
+    picture fallback the user can ask to look at another file, which redraws it.
 
     ---- Inputs ----
     session : ViewerSession
@@ -219,7 +222,7 @@ def _review_asker(session: ViewerSession,
     options = [('yes', 'Yes, accept'),
                ('no', change_label),
                ]
-    if len(session.summaries) > 1:
+    if len(session.summaries) > 1 and not session.window.is_interactive:
         options.append(('file', 'Look at another file in the plot window first'))
     while True:
         choice = choice_asker(question, options, 'yes')
@@ -403,12 +406,29 @@ def browser_stage_runner(session: ViewerSession, answers: dict) -> None:
     preview_drawer
     """
 
+    total = len(session.summaries)
+    if session.window.is_interactive:
+        preview_drawer(session,
+                       _answers_previewer(answers, None, 'raw'),
+                       {},
+                       None,
+                       {},
+                       show_ignored=False,
+                       )
+        info_printer(f'{total} file(s) are shown on the right. Use the arrows or the '
+                     f'list under the plot (or Page Up / Page Down) to look through '
+                     f'them.',
+                     )
+        choice_asker('Have you finished looking through the files?',
+                     [('continue', 'Yes, continue to trimming and ignoring')],
+                     'continue',
+                     )
+        return
     options = [('next', 'Next file'),
                ('previous', 'Previous file'),
                ('goto', 'Go to a specific file'),
                ('continue', 'Continue to trimming and ignoring'),
                ]
-    total = len(session.summaries)
     while True:
         summary = session.summaries[session.current]
         preview_drawer(session,
@@ -616,6 +636,7 @@ def viewer_asker(summaries: List[dict],
     analysis_stage_runner
     browser_stage_runner
     choice_asker
+    file_focus_setter
     heading_printer
     numbering_getter
     numbering_setter
@@ -624,7 +645,16 @@ def viewer_asker(summaries: List[dict],
     trim_stage_runner
     """
 
-    session = ViewerSession(summaries, export_root, ViewerWindow(PREVIEW_FILE))
+    window = active_gui_getter() or PictureWindow(PREVIEW_FILE)
+    session = ViewerSession(summaries, export_root, window)
+    window.session_attacher(session)
+    names = [s['name'] for s in summaries]
+
+    def focus(name: str) -> None:
+        session.current = names.index(name)
+        window.file_focuser(name)
+
+    file_focus_setter(focus)
     state: dict = {}
 
     # ---- run_browser -----------------------------------------------------------------
@@ -699,6 +729,7 @@ def viewer_asker(summaries: List[dict],
                              f'Go back to them if this change affects them.',
                              )
     finally:
+        file_focus_setter(None)
         session.window.window_closer()
 
     # ---- 4 Return the answers --------------------------------------------------------

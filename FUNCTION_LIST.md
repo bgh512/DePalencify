@@ -1,8 +1,8 @@
-# DePalencify - Function List
+# . - Function List
 
-- **Project:** DePalencify
-- **Version:** V2.2
-- **Date:** 30/10/2026
+- **Project:** .
+- **Version:** V2.3
+- **Date:** 31/10/2026
 
 ## Contents
 
@@ -15,6 +15,7 @@
     - [`experiment_processor`](#experiment_processor)
     - [`last_answers_loader`](#last_answers_loader)
     - [`last_answers_saver`](#last_answers_saver)
+    - [`program_runner`](#program_runner)
     - [`main`](#main)
     - [`special_figures_maker`](#special_figures_maker)
 - [`utils_custom/custom_config.py`](#utils_customcustom_configpy)
@@ -241,6 +242,9 @@
     - [`experiment_normaliser`](#experiment_normaliser)
     - [`percent_converter`](#percent_converter)
     - [`percent_scaler`](#percent_scaler)
+- [`utils_shared/output_capture.py`](#utils_sharedoutput_capturepy)
+    - [`captured_buffer_getter`](#captured_buffer_getter)
+    - [`output_capturer`](#output_capturer)
 - [`utils_shared/paf_reader.py`](#utils_sharedpaf_readerpy)
     - [`PafError`](#paferror)
     - [`Spectra`](#spectra)
@@ -299,6 +303,7 @@
     - [`s_array_generator`](#s_array_generator)
     - [`spectrum_decomposer`](#spectrum_decomposer)
 - [`utils_shared/survey.py`](#utils_sharedsurveypy)
+    - [`_file_focuser`](#_file_focuser)
     - [`_columns_text_builder`](#_columns_text_builder)
     - [`_event_line_builder`](#_event_line_builder)
     - [`_first_event_finder`](#_first_event_finder)
@@ -311,6 +316,7 @@
     - [`averaging_asker`](#averaging_asker)
     - [`decomposition_asker`](#decomposition_asker)
     - [`event_asker`](#event_asker)
+    - [`file_focus_setter`](#file_focus_setter)
     - [`files_asker`](#files_asker)
     - [`haem_form_option_builder`](#haem_form_option_builder)
     - [`haem_name_formatter`](#haem_name_formatter)
@@ -326,12 +332,21 @@
     - [`trim_asker`](#trim_asker)
 - [`utils_shared/trimming.py`](#utils_sharedtrimmingpy)
     - [`experiment_trimmer`](#experiment_trimmer)
+- [`utils_viewer/viewer_gui.py`](#utils_viewerviewer_guipy)
+    - [`GuiUnavailable`](#guiunavailable)
+    - [`ViewerGui`](#viewergui)
+    - [`active_gui_getter`](#active_gui_getter)
+    - [`gui_runner`](#gui_runner)
 - [`utils_viewer/viewer_preview.py`](#utils_viewerviewer_previewpy)
+    - [`PreviewSpec`](#previewspec)
     - [`ViewerSession`](#viewersession)
     - [`_info_builder`](#_info_builder)
-    - [`_overlay_drawer`](#_overlay_drawer)
     - [`_loaded_experiment_getter`](#_loaded_experiment_getter)
+    - [`_overlay_drawer`](#_overlay_drawer)
     - [`preview_drawer`](#preview_drawer)
+    - [`preview_figure_builder`](#preview_figure_builder)
+- [`utils_viewer/viewer_renderer.py`](#utils_viewerviewer_rendererpy)
+    - [`PreviewRenderer`](#previewrenderer)
 - [`utils_viewer/viewer_stages.py`](#utils_viewerviewer_stagespy)
     - [`_answers_previewer`](#_answers_previewer)
     - [`_file_chooser`](#_file_chooser)
@@ -342,8 +357,13 @@
     - [`plots_stage_runner`](#plots_stage_runner)
     - [`trim_stage_runner`](#trim_stage_runner)
     - [`viewer_asker`](#viewer_asker)
+- [`utils_viewer/viewer_terminal.py`](#utils_viewerviewer_terminalpy)
+    - [`OutputRouter`](#outputrouter)
+    - [`ansi_colour_getter`](#ansi_colour_getter)
+    - [`ansi_splitter`](#ansi_splitter)
+    - [`ansi_style_updater`](#ansi_style_updater)
 - [`utils_viewer/viewer_window.py`](#utils_viewerviewer_windowpy)
-    - [`ViewerWindow`](#viewerwindow)
+    - [`PictureWindow`](#picturewindow)
 
 ## `config.py`
 
@@ -722,12 +742,12 @@ None.
 None.
 ```
 
-#### `main`
+#### `program_runner`
 
 ```text
 ---- Summary ----
-Main function of the program: ask the questions, process every file, then draw the
-comparison and special figures, logging the output to a file.
+Main function to run the program: ask the questions, process every file, then draw
+the comparison and special figures, logging the output to a file.
 
 ---- Inputs ----
 None.
@@ -754,6 +774,34 @@ experiment_processor
 logging_starter
 logging_stopper
 special_figures_maker
+```
+
+#### `main`
+
+```text
+---- Summary ----
+Main function of the program: run it in the experiment browser window (terminal on
+the left, plots on the right), or in the terminal when the window cannot open.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+VERSION (shown in the window title).
+
+---- Outputs ----
+int
+    0 when every file finished, 1 when the run was cancelled or a file failed.
+
+---- Globals mutated ----
+None. Opens the window or runs in the terminal (side effects).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+gui_runner
+program_runner
 ```
 
 #### `special_figures_maker`
@@ -8046,6 +8094,67 @@ measurement_column_finder
 time_getter
 ```
 
+## `utils_shared/output_capture.py`
+
+Per-thread capture of printed output, so one thread can print without the text reaching
+
+### MAIN FUNCTIONS
+
+#### `captured_buffer_getter`
+
+```text
+---- Summary ----
+Main function to give the buffer that the current thread's output is being captured
+in, if any. Output streams that support the capture check this before they write.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+_local (module state).
+
+---- Outputs ----
+Optional[io.StringIO]
+    The buffer of the current thread, or None when its output is not captured.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `output_capturer`
+
+```text
+---- Summary ----
+Main function to capture everything the current thread prints, while other threads
+keep printing normally. Only output streams that check captured_buffer_getter honour
+it (the experiment browser window and the log copier do).
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+_local (module state).
+
+---- Outputs ----
+Iterator[io.StringIO]
+    The buffer the output is collected in; read it with getvalue().
+
+---- Globals mutated ----
+None. Sets and clears the capture of the current thread (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
 ## `utils_shared/paf_reader.py`
 
 Direct reader of Espana Scientific Software .paf files.
@@ -9677,8 +9786,9 @@ None.
 
 ```text
 ---- Summary ----
-Method to write text to every stream and flush it. The name is fixed by the
-file-like protocol.
+Method to write text to every stream and flush it, unless the current thread is
+capturing its output (see output_capture), in which case it is kept by the
+capture. The name is fixed by the file-like protocol.
 
 ---- Inputs ----
 text : str
@@ -9698,7 +9808,7 @@ None. Writes to and flushes every stream (side effect).
 None.
 
 ---- Helpers ----
-None.
+captured_buffer_getter
 ```
 
 ### MAIN FUNCTIONS
@@ -10183,6 +10293,34 @@ Numbered terminal questions of the main program (sections 1 to 5).
 
 ### SURVEY HELPERS
 
+#### `_file_focuser`
+
+```text
+---- Summary ----
+Helper function to tell the experiment browser which file the next question is
+about, so its window shows that file. Does nothing without the browser.
+
+---- Inputs ----
+name : str
+    File name.
+
+---- Globals read ----
+_file_focus_hook (module state).
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Calls the hook (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
 #### `_columns_text_builder`
 
 ```text
@@ -10341,6 +10479,7 @@ None. Reads from and prints to the terminal (side effect).
 None.
 
 ---- Helpers ----
+_file_focuser
 info_printer
 number_asker
 yes_no_asker
@@ -10580,12 +10719,41 @@ None.
 
 ---- Helpers ----
 _event_line_builder
+_file_focuser
 info_printer
 number_asker
 numbering_setter
 numbers_asker
 text_asker
 yes_no_asker
+```
+
+#### `file_focus_setter`
+
+```text
+---- Summary ----
+Main function to set (or clear, with None) the function that is told which file a
+question is about.
+
+---- Inputs ----
+hook : Optional[Callable[[str], None]]
+    Function taking the file name, or None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+Sets _file_focus_hook (module state).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
 ```
 
 #### `files_asker`
@@ -10804,6 +10972,7 @@ None. Reads from and prints to the terminal (side effect).
 None.
 
 ---- Helpers ----
+_file_focuser
 info_printer
 number_asker
 numbering_restarter
@@ -11065,18 +11234,900 @@ t_new = t - start_time; rows kept where start_time <= t <= end_time.
 None.
 ```
 
-## `utils_viewer/viewer_preview.py`
+## `utils_viewer/viewer_gui.py`
 
-Processing and drawing of one experiment as a preview in the plot window.
+The experiment browser window: a text terminal on the left that asks the questions, and
 
 ### CLASSES
+
+#### `GuiUnavailable`
+
+```text
+---- Summary ----
+Raised when the browser window cannot be opened (no Tkinter, no display, or the
+window was switched off), so the program can use the terminal instead.
+
+---- Attributes ----
+None.
+
+---- Globals read ----
+None.
+
+---- Methods ----
+None.
+```
+
+#### `ViewerGui`
+
+```text
+---- Summary ----
+The experiment browser window. The program's questions run in their own thread and
+their text and answers pass through the terminal on the left, so the plot on the
+right stays usable while a question waits. Previews are drawn by a third thread.
+
+---- Attributes ----
+is_interactive : bool
+    Always True: the window has its own file controls.
+logic_thread : Optional[threading.Thread]
+    The thread running the program, whose output belongs in the terminal.
+exit_code : int
+    What the program returned (1 when it was stopped).
+
+---- Globals read ----
+MONO_FONTS and the colour constants (module constants).
+
+---- Methods ----
+__init__
+_answer_sender
+_closing_handler
+_drain_runner
+_event_handler
+_history_stepper
+_image_receiver
+_logic_runner
+_navigator
+_pane_writer
+_picture_shower
+_step_taker
+_widgets_builder
+file_focuser
+figure_shower
+input_reader
+output_capturer
+run
+session_attacher
+spec_publisher
+text_sender
+window_closer
+```
+
+##### `__init__`
+
+```text
+---- Summary ----
+Method to build the window and set up the queues between its threads.
+
+---- Inputs ----
+tk : Any
+    The tkinter module.
+root : Any
+    The Tk root window.
+program : Callable[[], int]
+    The program to run; it asks the questions and returns its exit code.
+title : str
+    Window title.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Sets the attributes on the instance and builds the widgets.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_widgets_builder
+```
+
+##### `_widgets_builder`
+
+```text
+---- Summary ----
+Method to build the terminal, the answer box, the plot and its file controls.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+MONO_FONTS and the colour constants (module constants).
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Creates the widgets (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+##### `_nav_state`
+
+```text
+---- Summary ----
+Method to switch the file selector and arrows on or off.
+
+---- Inputs ----
+enabled : bool
+    True to allow navigation.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Changes the widget states (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+##### `_message_shower`
+
+```text
+---- Summary ----
+Method to replace the plot with a short message.
+
+---- Inputs ----
+text : str
+    Message to show.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Redraws the plot area (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+##### `_resizer`
+
+```text
+---- Summary ----
+Method to redraw the picture at the new size once the window has stopped
+changing size.
+
+---- Inputs ----
+event : Any
+    The Tk configure event (unused).
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Schedules a redraw (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_picture_shower
+```
+
+##### `_picture_shower`
+
+```text
+---- Summary ----
+Method to show the picture of the current file, scaled to fit the plot area, or
+say why there is none yet.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Redraws the plot area and the status line (side effect).
+
+---- Equations ----
+scale = min(width / picture width, height / picture height), at most 1.5.
+
+---- Helpers ----
+_message_shower
+```
+
+##### `_navigator`
+
+```text
+---- Summary ----
+Method to make a file the current one and show it.
+
+---- Inputs ----
+index : int
+    Position of the file in the list.
+is_from_user : bool
+    True when the user chose it, so the answer box gets the keyboard back.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Updates the selector, the plot and the renderer's order (side effects).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_picture_shower
+```
+
+##### `_step_taker`
+
+```text
+---- Summary ----
+Method to move to the next or previous file, looping round at the ends.
+
+---- Inputs ----
+step : int
+    +1 for the next file, -1 for the previous one.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Changes the current file (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_navigator
+```
+
+##### `_pane_writer`
+
+```text
+---- Summary ----
+Method to add text to the terminal, with its colours, overwriting the line when
+the text starts with a carriage return (progress messages).
+
+---- Inputs ----
+text : str
+    Text as printed.
+kind : str
+    'out' (normal), 'err' (error text) or 'answer' (what the user typed).
+
+---- Globals read ----
+ANSWER_COLOUR, ERROR_COLOUR (module constants).
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Adds text to the terminal and scrolls it (side effects).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+ansi_splitter
+ansi_style_updater
+```
+
+##### `_answer_sender`
+
+```text
+---- Summary ----
+Method to pass the typed answer to the question that is waiting for it.
+
+---- Inputs ----
+event : Any
+    The Tk key event (unused).
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Writes the answer into the terminal, clears and disables the answer box
+and wakes the question thread (side effects).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_pane_writer
+```
+
+##### `_history_stepper`
+
+```text
+---- Summary ----
+Method to recall an earlier answer in the answer box with the up and down keys.
+
+---- Inputs ----
+step : int
+    -1 for the previous answer, +1 for the next one.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Changes the text of the answer box (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+##### `_image_receiver`
+
+```text
+---- Summary ----
+Method to take a finished preview from the renderer and show it if it is the
+current file. Previews of older settings are dropped.
+
+---- Inputs ----
+version : int
+    Number of the request the preview was drawn for.
+name : str
+    File name.
+png : Optional[bytes]
+    Picture, or None when it could not be drawn.
+notes : str
+    Warnings, or the reason when there is no picture.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Stores the preview and may redraw the plot area (side effects).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_picture_shower
+```
+
+##### `_event_handler`
+
+```text
+---- Summary ----
+Method to carry out one message from the other threads, on the window thread.
+
+---- Inputs ----
+event : tuple
+    (kind, ...) with kind 'prompt', 'spec', 'focus', 'session', 'image',
+    'closed' or 'finished'.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Changes the window (side effects).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_image_receiver
+_navigator
+_pane_writer
+_picture_shower
+```
+
+##### `_drain_runner`
+
+```text
+---- Summary ----
+Method that runs on the window thread every few milliseconds and carries out the
+messages the other threads have queued, joining consecutive text into one
+insert.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Changes the window and schedules itself again (side effects).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_event_handler
+_pane_writer
+```
+
+##### `_closing_handler`
+
+```text
+---- Summary ----
+Method to close the window. While the program is still running the user is asked
+first, and a question that is waiting is ended so the program stops cleanly.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Stops the threads and closes the window (side effects).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+##### `_logic_runner`
+
+```text
+---- Summary ----
+Method that runs the program in its own thread and reports when it is done.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Sets exit_code and queues the finished message (side effects).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+##### `file_focuser`
+
+```text
+---- Summary ----
+Method to show the file a question is about. It is called from the question
+thread.
+
+---- Inputs ----
+name : str
+    Name of the file.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Queues the change for the window (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+##### `figure_shower`
+
+```text
+---- Summary ----
+Method that is never needed: the window draws its own previews from the
+settings (spec_publisher).
+
+---- Inputs ----
+figure : Any
+    A drawn figure (ignored).
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+##### `input_reader`
+
+```text
+---- Summary ----
+Method that replaces the built-in input while the window is open: it shows the
+prompt in the terminal and waits for the answer typed in the answer box. Other
+threads still use the real input.
+
+---- Inputs ----
+prompt : Any
+    The prompt text, for example "   > ".
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+str
+    The typed answer. Raises EOFError when the window is closed.
+
+---- Globals mutated ----
+None. Waits for the user (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+##### `output_capturer`
+
+```text
+---- Summary ----
+Method to capture what the current thread prints (the preview thread), without
+touching the terminal or the log file.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+Iterator[io.StringIO]
+    The buffer the output is collected in.
+
+---- Globals mutated ----
+None. Captures the output of the current thread (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+output_capturer
+```
+
+##### `run`
+
+```text
+---- Summary ----
+Method to run the program in the window: take over the output streams and the
+input, start the program thread, and run the window until it is closed.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+int
+    The exit code of the program (1 when the window was closed before it
+    finished).
+
+---- Globals mutated ----
+None. Replaces sys.stdout, sys.stderr and the built-in input while the window
+runs, and restores them afterwards (side effects).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_drain_runner
+_logic_runner
+```
+
+##### `session_attacher`
+
+```text
+---- Summary ----
+Method to give the window the files of the browser session, which fills the
+file selector and starts the preview thread.
+
+---- Inputs ----
+session : ViewerSession
+    The browser session.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Queues the session for the window (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+##### `spec_publisher`
+
+```text
+---- Summary ----
+Method to give the window new settings: every file is drawn again with them.
+
+---- Inputs ----
+spec : PreviewSpec
+    The settings to draw with.
+name : Optional[str]
+    File to show first, or None to stay on the current file.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Queues the settings for the window (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+##### `text_sender`
+
+```text
+---- Summary ----
+Method to queue text from the program thread for the terminal.
+
+---- Inputs ----
+text : str
+    Text as printed.
+kind : str
+    'out' or 'err'.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Queues the text (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+##### `window_closer`
+
+```text
+---- Summary ----
+Method to end the previews when the browser steps are over: the preview thread
+is stopped (so it cannot clash with the processing that follows) and the file
+controls are switched off. The last picture stays on show.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Stops the preview thread and queues the change (side effects).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+##### `_image_deliverer`
+
+```text
+---- Summary ----
+Method to queue a finished preview from the preview thread for the window.
+
+---- Inputs ----
+version : int
+    Number of the request it was drawn for.
+name : str
+    File name.
+png : Optional[bytes]
+    Picture, or None when it could not be drawn.
+notes : str
+    Warnings, or the reason when there is no picture.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Queues the preview (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+### MAIN FUNCTIONS
+
+#### `active_gui_getter`
+
+```text
+---- Summary ----
+Main function to give the browser window that is open, if any.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+_active_gui (module state).
+
+---- Outputs ----
+Optional[ViewerGui]
+    The open window, or None when the program runs in the terminal.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `gui_runner`
+
+```text
+---- Summary ----
+Main function to run the whole program inside the browser window. It returns None
+without running anything when the window cannot be opened, so the caller can run
+the program in the terminal instead.
+
+---- Inputs ----
+program : Callable[[], int]
+    The program; it asks the questions and returns its exit code.
+title : str
+    Window title.
+
+---- Globals read ----
+os.environ["DEPALENCIFY_NO_GUI"] (set to anything to keep the terminal).
+
+---- Outputs ----
+Optional[int]
+    The exit code of the program, or None when the window could not be opened.
+
+---- Globals mutated ----
+None. Opens the window and runs the program (side effects); prints why the window
+could not open when it could not.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+ViewerGui
+```
+
+## `utils_viewer/viewer_preview.py`
+
+Processing and drawing of one experiment as a preview figure.
+
+### CLASSES
+
+#### `PreviewSpec`
+
+```text
+---- Summary ----
+The settings a preview is drawn with: the answers given so far. Every file is drawn
+with the same spec, so the files can be compared.
+Detailed structure can be found in DATA_FORMAT.md.
+```
 
 #### `ViewerSession`
 
 ```text
 ---- Summary ----
-Everything the experiment browser keeps between steps: the files, the plot window
-and the recently read experiments.
+Everything the experiment browser keeps between steps: the files, the window and the
+recently read experiments.
 Detailed structure can be found in DATA_FORMAT.md.
 ```
 
@@ -11107,41 +12158,6 @@ dict
 
 ---- Globals mutated ----
 None.
-
----- Equations ----
-None.
-
----- Helpers ----
-None.
-```
-
-#### `_overlay_drawer`
-
-```text
----- Summary ----
-Helper function to shade regions of the time axis on every panel of the preview.
-
----- Inputs ----
-fig : Figure
-    The preview figure.
-axes : list
-    Panels of the preview, top to bottom.
-regions : list
-    [(start_min, end_min, kind)] with kind 'trim' (grey hatched) or 'ignore'
-    (amber).
-note : str
-    Short explanation of the shading, written in the corner of the figure; may be
-    empty.
-
----- Globals read ----
-IGNORE_COLOUR, TRIM_COLOUR (module constants).
-
----- Outputs ----
-None
-    Nothing.
-
----- Globals mutated ----
-None. Adds shaded regions and the note to the figure (side effects).
 
 ---- Equations ----
 None.
@@ -11183,14 +12199,51 @@ None.
 experiment_paf_loader
 ```
 
+#### `_overlay_drawer`
+
+```text
+---- Summary ----
+Helper function to shade regions of the time axis on every panel of the preview.
+
+---- Inputs ----
+fig : Figure
+    The preview figure.
+axes : list
+    Panels of the preview, top to bottom.
+regions : list
+    [(start_min, end_min, kind)] with kind 'trim' (grey hatched) or 'ignore'
+    (amber).
+note : str
+    Short explanation of the shading, written in the corner of the figure; may be
+    empty.
+
+---- Globals read ----
+IGNORE_COLOUR, TRIM_COLOUR (module constants).
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Adds shaded regions and the note to the figure (side effects).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
 ### MAIN FUNCTIONS
 
 #### `preview_drawer`
 
 ```text
 ---- Summary ----
-Main function to process one file with the answers given so far and draw it in the
-plot window. Problems are reported, never raised, so the questions carry on.
+Main function to show the answers given so far in the window. A window with its own
+controls (the experiment browser window) is given the settings and draws every file
+the user looks at with them; otherwise the current file is drawn and saved as a
+picture. Problems are reported, never raised, so the questions carry on.
 
 ---- Inputs ----
 session : ViewerSession
@@ -11209,17 +12262,53 @@ show_trim : bool
 show_ignored : bool
     True to shade the ignored start and end in amber.
 name : Optional[str]
-    File to draw; None draws the current file of the session.
+    File to show; None keeps the file being looked at.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+bool
+    True when the preview was drawn (or handed to the window), False when it could
+    not be.
+
+---- Globals mutated ----
+None. Draws in the window or writes the preview picture (side effects).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+preview_figure_builder
+```
+
+#### `preview_figure_builder`
+
+```text
+---- Summary ----
+Main function to process one file with the answers of a spec and draw it in a new
+figure. Problems are reported, never raised.
+
+---- Inputs ----
+session : ViewerSession
+    The browser session (files, window, cache).
+spec : PreviewSpec
+    The settings to draw with.
+name : str
+    Name of the file to draw.
 
 ---- Globals read ----
 settings.Config; PREVIEW_DPI (module constant).
 
 ---- Outputs ----
-bool
-    True when the preview was drawn, False when it could not be.
+Tuple[Optional[Figure], str]
+    (figure, notes). The figure is None when the preview could not be drawn, and
+    the notes then say why. Otherwise the notes are the warnings of the processing
+    (a skipped step, a missing OD), one per line, and may be empty.
 
 ---- Globals mutated ----
-None. Draws in the plot window and prints warnings (side effects).
+None. Sets the matplotlib rcParams of the figure style (side effect). Nothing is
+printed; the caller decides where the notes go.
 
 ---- Equations ----
 None.
@@ -11228,6 +12317,235 @@ None.
 _info_builder
 _loaded_experiment_getter
 _overlay_drawer
+```
+
+## `utils_viewer/viewer_renderer.py`
+
+The background thread of the experiment browser window that draws the previews.
+
+### CLASSES
+
+#### `PreviewRenderer`
+
+```text
+---- Summary ----
+Thread that draws the preview of every file with the latest settings, the file being
+looked at first and then its neighbours, so the files can be flicked through while a
+question waits. A newer request makes it drop the work for the older one.
+
+---- Attributes ----
+None public.
+
+---- Globals read ----
+PREVIEW_DPI (imported constant).
+
+---- Methods ----
+__init__
+_next_picker
+_picture_maker
+request_setter
+run
+stopper
+wanted_setter
+```
+
+##### `__init__`
+
+```text
+---- Summary ----
+Method to set up the thread (it is started by the caller).
+
+---- Inputs ----
+session : ViewerSession
+    The browser session (files, cache).
+deliver : Callable[[int, str, Optional[bytes], str], None]
+    Function called with (version, file name, PNG bytes or None, notes) for each
+    finished preview. It is called from this thread.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Sets the attributes on the instance.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+##### `_next_picker`
+
+```text
+---- Summary ----
+Method to pick the file to draw next: the nearest one to the file being looked
+at that has not been drawn with the current settings. The caller holds the lock.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+Optional[str]
+    File name, or None when every file is drawn.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+##### `_picture_maker`
+
+```text
+---- Summary ----
+Method to draw one file and turn the figure into a PNG picture.
+
+---- Inputs ----
+spec : PreviewSpec
+    The settings to draw with.
+name : str
+    Name of the file.
+
+---- Globals read ----
+PREVIEW_DPI (imported constant).
+
+---- Outputs ----
+Tuple[Optional[bytes], str]
+    (PNG bytes, notes); the bytes are None when the preview could not be drawn
+    and the notes then say why.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+preview_figure_builder
+```
+
+##### `request_setter`
+
+```text
+---- Summary ----
+Method to ask for every file to be drawn again with new settings.
+
+---- Inputs ----
+spec : PreviewSpec
+    The new settings.
+version : int
+    Number of this request; results carry it so old ones can be dropped.
+wanted : int
+    Index of the file being looked at, which is drawn first.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Replaces the work of the thread (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+##### `run`
+
+```text
+---- Summary ----
+Method that draws previews until stopped. The name is fixed by the thread
+protocol.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Passes each finished preview to the window (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+_next_picker
+_picture_maker
+```
+
+##### `stopper`
+
+```text
+---- Summary ----
+Method to stop the thread and wait until it has finished its current preview.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Stops the thread (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+##### `wanted_setter`
+
+```text
+---- Summary ----
+Method to say which file is being looked at, so it is drawn next.
+
+---- Inputs ----
+wanted : int
+    Index of the file.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Changes the order of the work (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
 ```
 
 ## `utils_viewer/viewer_stages.py`
@@ -11330,8 +12648,9 @@ info_printer
 
 ```text
 ---- Summary ----
-Helper function to ask whether the user accepts what the plot window shows. The user
-can also look at another file, which redraws the window, before deciding.
+Helper function to ask whether the user accepts what the plot window shows. In the
+browser window the user flicks through the files while the question waits; with the
+picture fallback the user can ask to look at another file, which redraws it.
 
 ---- Inputs ----
 session : ViewerSession
@@ -11566,6 +12885,7 @@ None.
 analysis_stage_runner
 browser_stage_runner
 choice_asker
+file_focus_setter
 heading_printer
 numbering_getter
 numbering_setter
@@ -11574,51 +12894,55 @@ section_starter
 trim_stage_runner
 ```
 
-## `utils_viewer/viewer_window.py`
+## `utils_viewer/viewer_terminal.py`
 
-The plot window of the experiment browser: one window that is redrawn after each answer.
+Pieces of the text terminal in the experiment browser window: colour codes and the
 
 ### CLASSES
 
-#### `ViewerWindow`
+#### `OutputRouter`
 
 ```text
 ---- Summary ----
-One plot window that shows the preview of the current step. When no plot window can
-be opened (no display, or no GUI library) the preview is saved to a picture file
-instead, which is opened in the default picture viewer.
+File-like object that replaces sys.stdout and sys.stderr while the browser window
+is open. What the program's own thread prints goes to the terminal in the window;
+what other threads print goes to the real stream; and a thread that is capturing its
+output (output_capturer) keeps it to itself.
 
 ---- Attributes ----
-preview_path : Path
-    Picture file used when no plot window can be opened.
-is_window : bool
-    True when previews appear in a plot window, False when they go to the file.
-backend_name : Optional[str]
-    Name of the matplotlib backend of the plot window, None for the file.
-fig : Optional[Figure]
-    The figure being redrawn, None before the first preview.
+encoding : str
+    Always "utf-8".
 
 ---- Globals read ----
-BACKENDS_MAC, BACKENDS_OTHER, PREVIEW_DPI, WINDOW_TITLE (module constants).
+None.
 
 ---- Methods ----
 __init__
-_backend_starter
-_file_opener
-figure_getter
-window_closer
-window_refresher
+__getattr__
+fileno
+flush
+isatty
+reconfigure
+write
 ```
 
 ##### `__init__`
 
 ```text
 ---- Summary ----
-Method to set up the window object without opening anything yet.
+Method to store where the text goes.
 
 ---- Inputs ----
-preview_path : Path
-    Picture file used when no plot window can be opened.
+original : Any
+    The stream that was replaced; used for other threads and after the window is
+    closed.
+sender : Callable[[str, str], None]
+    Function that passes (text, kind) to the window.
+kind : str
+    'out' for standard output or 'err' for standard error.
+owner : Callable[[], Optional[threading.Thread]]
+    Function that gives the thread whose output belongs in the window (None
+    once the window is closed).
 
 ---- Globals read ----
 None.
@@ -11637,26 +12961,314 @@ None.
 None.
 ```
 
-##### `_backend_starter`
+##### `__getattr__`
 
 ```text
 ---- Summary ----
-Method to switch matplotlib to the first interactive backend that works, once.
-The program normally runs on the non-interactive Agg backend.
+Method to pass any other attribute lookup to the stream that was replaced.
+
+---- Inputs ----
+name : str
+    Attribute name that was not found on the instance.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+Any
+    The attribute of the original stream.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+##### `fileno`
+
+```text
+---- Summary ----
+Method that says there is no file descriptor, so libraries that ask for one fall
+back to plain writes. The name is fixed by the file-like protocol.
 
 ---- Inputs ----
 None.
 
 ---- Globals read ----
-BACKENDS_MAC, BACKENDS_OTHER (module constants).
+None.
+
+---- Outputs ----
+int
+    Never returns; raises io.UnsupportedOperation.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+##### `flush`
+
+```text
+---- Summary ----
+Method that does nothing: text is passed on as soon as it is written. The name
+is fixed by the file-like protocol.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
 
 ---- Outputs ----
 None
     Nothing.
 
 ---- Globals mutated ----
-None. Switches the matplotlib backend and sets is_window and backend_name
-(side effects).
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+##### `isatty`
+
+```text
+---- Summary ----
+Method to say that the stream shows colour, because the terminal in the window
+does. The name is fixed by the file-like protocol.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+bool
+    Always True.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+##### `reconfigure`
+
+```text
+---- Summary ----
+Method that accepts and ignores new stream settings, because the window shows
+every symbol.
+
+---- Inputs ----
+**kwargs : Any
+    Stream settings (ignored).
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+##### `write`
+
+```text
+---- Summary ----
+Method to send text where it belongs: the capture of the thread, the window, or
+the real stream. The name is fixed by the file-like protocol.
+
+---- Inputs ----
+text : str
+    Text to write.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+int
+    Number of characters written.
+
+---- Globals mutated ----
+None. Passes text to the window or the real stream (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+### TERMINAL HELPERS
+
+#### `ansi_colour_getter`
+
+```text
+---- Summary ----
+Main function to give the colour of an entry of the 256-colour terminal palette.
+
+---- Inputs ----
+index : int
+    Palette number, 0 to 255 (0-15 basic, 16-231 colour cube, 232-255 greys).
+
+---- Globals read ----
+BASIC_COLOURS (module constant).
+
+---- Outputs ----
+str
+    The colour as "#rrggbb".
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+Cube colours: each of red, green and blue is 0 for level 0 and 55 + 40 * level
+for levels 1 to 5, where index - 16 = 36 * red level + 6 * green level + blue
+level. Greys: 8 + 10 * (index - 232).
+
+---- Helpers ----
+None.
+```
+
+#### `ansi_splitter`
+
+```text
+---- Summary ----
+Main function to cut printed text into plain text, colour codes and carriage
+returns, in order, so a text window can colour the text and overwrite progress
+lines.
+
+---- Inputs ----
+text : str
+    Text as printed, possibly with colour codes (ESC[...m) and carriage returns.
+
+---- Globals read ----
+_CODE_PATTERN (module constant).
+
+---- Outputs ----
+List[Tuple[str, str]]
+    [(kind, value)] with kind 'text' (the characters), 'code' (the numbers of a
+    colour code, for example "1;33") or 'return' (value empty). A carriage return
+    directly before a new line is part of the line ending and is dropped.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+#### `ansi_style_updater`
+
+```text
+---- Summary ----
+Main function to apply one colour code to the current text style.
+
+---- Inputs ----
+style : Dict[str, Any]
+    {fg, bold, italic}: colour as "#rrggbb" or None for the default, and two flags.
+code : str
+    Numbers of the colour code, separated by semicolons ("" means reset).
+
+---- Globals read ----
+BASIC_COLOURS (module constant).
+
+---- Outputs ----
+Dict[str, Any]
+    The new style; ``style`` is not changed.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+ansi_colour_getter
+```
+
+## `utils_viewer/viewer_window.py`
+
+The fallback preview of the experiment browser: one picture file that is rewritten after
+
+### CLASSES
+
+#### `PictureWindow`
+
+```text
+---- Summary ----
+The stand-in for the browser window when no window can be opened (no display, or no
+Tkinter). Each preview is saved as a picture file, which is opened in the default
+picture viewer the first time. It has the same methods as ViewerGui so the questions
+do not need to know which one they are using.
+
+---- Attributes ----
+preview_path : Path
+    Picture file the previews are saved to.
+is_interactive : bool
+    Always False: the picture cannot be navigated, only rewritten.
+
+---- Globals read ----
+PREVIEW_DPI (module constant).
+
+---- Methods ----
+__init__
+_file_opener
+figure_shower
+file_focuser
+output_capturer
+session_attacher
+window_closer
+```
+
+##### `__init__`
+
+```text
+---- Summary ----
+Method to set up the stand-in without writing anything yet.
+
+---- Inputs ----
+preview_path : Path
+    Picture file the previews are saved to.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None. Sets the attributes on the instance.
 
 ---- Equations ----
 None.
@@ -11669,8 +13281,7 @@ None.
 
 ```text
 ---- Summary ----
-Method to open the preview picture in the default picture viewer (once), so the
-preview can be seen without a plot window.
+Method to open the preview picture in the default picture viewer (once).
 
 ---- Inputs ----
 None.
@@ -11693,70 +13304,16 @@ None.
 None.
 ```
 
-##### `figure_getter`
+##### `figure_shower`
 
 ```text
 ---- Summary ----
-Method to give the figure to draw the next preview in. The plot window is opened
-on the first call and opened again if the user closed it.
+Method to save the preview figure to the picture file and tell the user where it
+is.
 
 ---- Inputs ----
-None.
-
----- Globals read ----
-PREVIEW_DPI, WINDOW_TITLE (module constants).
-
----- Outputs ----
-Figure
-    The figure; the caller clears and redraws it.
-
----- Globals mutated ----
-None. May open the plot window and prints a note when it falls back to a picture
-file (side effects).
-
----- Equations ----
-None.
-
----- Helpers ----
-_backend_starter
-```
-
-##### `window_closer`
-
-```text
----- Summary ----
-Method to close the plot window and put matplotlib back on the Agg backend, so
-the rest of the run draws and saves figures as it always did.
-
----- Inputs ----
-None.
-
----- Globals read ----
-None.
-
----- Outputs ----
-None
-    Nothing.
-
----- Globals mutated ----
-None. Closes all figures and switches the matplotlib backend (side effects).
-
----- Equations ----
-None.
-
----- Helpers ----
-None.
-```
-
-##### `window_refresher`
-
-```text
----- Summary ----
-Method to show the figure that was just drawn: repaint the plot window, or save
-the picture file and tell the user where it is.
-
----- Inputs ----
-None.
+figure : Figure
+    The drawn preview.
 
 ---- Globals read ----
 PREVIEW_DPI (module constant).
@@ -11766,11 +13323,118 @@ None
     Nothing.
 
 ---- Globals mutated ----
-None. Repaints the window or writes the preview picture (side effects).
+None. Writes the picture file and prints its path (side effects).
 
 ---- Equations ----
 None.
 
 ---- Helpers ----
 _file_opener
+```
+
+##### `file_focuser`
+
+```text
+---- Summary ----
+Method that does nothing: a picture file has no file selector.
+
+---- Inputs ----
+name : str
+    Name of the file being asked about.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+##### `output_capturer`
+
+```text
+---- Summary ----
+Method to capture what the processing of a preview prints, so it does not
+clutter the questions.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+Iterator[io.StringIO]
+    The buffer the output is collected in.
+
+---- Globals mutated ----
+None. Replaces sys.stdout while the block runs (side effect).
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+##### `session_attacher`
+
+```text
+---- Summary ----
+Method that does nothing: the picture needs no list of files.
+
+---- Inputs ----
+session : Any
+    The browser session.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
+```
+
+##### `window_closer`
+
+```text
+---- Summary ----
+Method that does nothing: the picture file stays where it is.
+
+---- Inputs ----
+None.
+
+---- Globals read ----
+None.
+
+---- Outputs ----
+None
+    Nothing.
+
+---- Globals mutated ----
+None.
+
+---- Equations ----
+None.
+
+---- Helpers ----
+None.
 ```

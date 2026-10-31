@@ -31,6 +31,7 @@ from utils_shared.spectral_decomposer import fit_importer
 
 
 # ---- CONSTANTS -----------------------------------------------------------------------
+_file_focus_hook: Optional[Callable[[str], None]] = None
 JOURNAL_NAMES = {'nature': 'Nature',
                  'science': 'Science',
                  'cell': 'Cell',
@@ -43,6 +44,38 @@ OCR_LABELS = {'raw': 'OCR (µM min⁻¹)',
 
 
 # ---- SURVEY HELPERS ------------------------------------------------------------------
+
+
+# ---- _file_focuser -------------------------------------------------------------------
+def _file_focuser(name: str) -> None:
+    """
+    ---- Summary ----
+    Helper function to tell the experiment browser which file the next question is
+    about, so its window shows that file. Does nothing without the browser.
+
+    ---- Inputs ----
+    name : str
+        File name.
+
+    ---- Globals read ----
+    _file_focus_hook (module state).
+
+    ---- Outputs ----
+    None
+        Nothing.
+
+    ---- Globals mutated ----
+    None. Calls the hook (side effect).
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    None.
+    """
+
+    if _file_focus_hook is not None:
+        _file_focus_hook(name)
 
 
 # ---- _columns_text_builder -----------------------------------------------------------
@@ -232,6 +265,7 @@ def _limits_asker(summaries: List[dict],
     None.
 
     ---- Helpers ----
+    _file_focuser
     info_printer
     number_asker
     yes_no_asker
@@ -265,6 +299,7 @@ def _limits_asker(summaries: List[dict],
     # ---- 2 One value per file --------------------------------------------------------
     for summary in summaries:
         name = summary['name']
+        _file_focuser(name)
         old = remembered.get(name, {}).get(key)
         default = old if old is not None else common
         note = note_builder(summary)
@@ -642,6 +677,7 @@ def event_asker(summaries: List[dict], saved: dict) -> Dict[str, List[dict]]:
 
     ---- Helpers ----
     _event_line_builder
+    _file_focuser
     info_printer
     number_asker
     numbering_setter
@@ -690,6 +726,7 @@ def event_asker(summaries: List[dict], saved: dict) -> Dict[str, List[dict]]:
     for number in chosen:
         summary = with_events[number - 1]
         name = summary['name']
+        _file_focuser(name)
         events = result[name]
         info_printer(f'\n{name}:', depth=2)
         for event, entry in zip(summary['events'], events):
@@ -715,6 +752,38 @@ def event_asker(summaries: List[dict], saved: dict) -> Dict[str, List[dict]]:
                                                      blank_label='unknown',
                                                      )
     return result
+
+
+# ---- file_focus_setter ---------------------------------------------------------------
+def file_focus_setter(hook: Optional[Callable[[str], None]]) -> None:
+    """
+    ---- Summary ----
+    Main function to set (or clear, with None) the function that is told which file a
+    question is about.
+
+    ---- Inputs ----
+    hook : Optional[Callable[[str], None]]
+        Function taking the file name, or None.
+
+    ---- Globals read ----
+    None.
+
+    ---- Outputs ----
+    None
+        Nothing.
+
+    ---- Globals mutated ----
+    Sets _file_focus_hook (module state).
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    None.
+    """
+
+    global _file_focus_hook
+    _file_focus_hook = hook
 
 
 # ---- files_asker ---------------------------------------------------------------------
@@ -1109,6 +1178,7 @@ def od_asker(summaries: List[dict], saved: dict) -> Dict[str, dict]:
     None.
 
     ---- Helpers ----
+    _file_focuser
     info_printer
     number_asker
     numbering_restarter
@@ -1120,6 +1190,7 @@ def od_asker(summaries: List[dict], saved: dict) -> Dict[str, dict]:
     # ---- 2 Ask for each experiment ---------------------------------------------------
     for summary in summaries:
         name = summary['name']
+        _file_focuser(name)
         old = saved.get(name) or {}
         info_printer(f'\n{name}:', depth=2, tight=True)
         numbering_restarter(2)

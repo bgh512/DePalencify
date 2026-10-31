@@ -40,6 +40,7 @@ from utils_shared.survey import (analysis_asker,
                                  plot_asker,
                                  trim_asker,
                                  )
+from utils_viewer.viewer_gui import gui_runner
 from utils_viewer.viewer_stages import viewer_asker
 
 
@@ -563,12 +564,12 @@ def last_answers_saver(values: dict) -> None:
         pass  # a read-only folder just means the defaults are not remembered
 
 
-# ---- main ----------------------------------------------------------------------------
-def main() -> int:
+# ---- program_runner ------------------------------------------------------------------
+def program_runner() -> int:
     """
     ---- Summary ----
-    Main function of the program: ask the questions, process every file, then draw the
-    comparison and special figures, logging the output to a file.
+    Main function to run the program: ask the questions, process every file, then draw
+    the comparison and special figures, logging the output to a file.
 
     ---- Inputs ----
     None.
@@ -659,6 +660,40 @@ def main() -> int:
     finally:
         logging_stopper(log_session)
     return 1 if failed else 0
+
+
+# ---- main ----------------------------------------------------------------------------
+def main() -> int:
+    """
+    ---- Summary ----
+    Main function of the program: run it in the experiment browser window (terminal on
+    the left, plots on the right), or in the terminal when the window cannot open.
+
+    ---- Inputs ----
+    None.
+
+    ---- Globals read ----
+    VERSION (shown in the window title).
+
+    ---- Outputs ----
+    int
+        0 when every file finished, 1 when the run was cancelled or a file failed.
+
+    ---- Globals mutated ----
+    None. Opens the window or runs in the terminal (side effects).
+
+    ---- Equations ----
+    None.
+
+    ---- Helpers ----
+    gui_runner
+    program_runner
+    """
+
+    code = gui_runner(program_runner, f'DePalencify V{VERSION}')
+    if code is None:
+        code = program_runner()
+    return code
 
 
 # ---- special_figures_maker -----------------------------------------------------------

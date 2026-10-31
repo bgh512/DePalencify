@@ -1,66 +1,62 @@
 """
-The plot window of the experiment browser: one window that is redrawn after each answer.
+The fallback preview of the experiment browser: one picture file that is rewritten after
+each answer, for computers where the browser window cannot open.
 """
 
 # ---- STANDARD IMPORTS ----------------------------------------------------------------
+import io
 import os
 import subprocess
 import sys
+from contextlib import contextmanager, redirect_stdout
 from pathlib import Path
-from typing import Optional
+from typing import Any, Iterator
 
 # ---- 3RD PARTY IMPORTS ---------------------------------------------------------------
-import matplotlib.pyplot as plt
 from matplotlib.figure import Figure
 
 
 # ---- CONSTANTS -----------------------------------------------------------------------
-WINDOW_TITLE = 'DePalencify preview'
 PREVIEW_DPI = 200
-# Interactive backends tried in order; the first one that starts is used.
-BACKENDS_MAC = ('MacOSX', 'QtAgg', 'TkAgg')
-BACKENDS_OTHER = ('QtAgg', 'TkAgg')
 
 
-# ---- ViewerWindow --------------------------------------------------------------------
-class ViewerWindow:
+# ---- PictureWindow -------------------------------------------------------------------
+class PictureWindow:
     """
     ---- Summary ----
-    One plot window that shows the preview of the current step. When no plot window can
-    be opened (no display, or no GUI library) the preview is saved to a picture file
-    instead, which is opened in the default picture viewer.
+    The stand-in for the browser window when no window can be opened (no display, or no
+    Tkinter). Each preview is saved as a picture file, which is opened in the default
+    picture viewer the first time. It has the same methods as ViewerGui so the questions
+    do not need to know which one they are using.
 
     ---- Attributes ----
     preview_path : Path
-        Picture file used when no plot window can be opened.
-    is_window : bool
-        True when previews appear in a plot window, False when they go to the file.
-    backend_name : Optional[str]
-        Name of the matplotlib backend of the plot window, None for the file.
-    fig : Optional[Figure]
-        The figure being redrawn, None before the first preview.
+        Picture file the previews are saved to.
+    is_interactive : bool
+        Always False: the picture cannot be navigated, only rewritten.
 
     ---- Globals read ----
-    BACKENDS_MAC, BACKENDS_OTHER, PREVIEW_DPI, WINDOW_TITLE (module constants).
+    PREVIEW_DPI (module constant).
 
     ---- Methods ----
     __init__
-    _backend_starter
     _file_opener
-    figure_getter
+    figure_shower
+    file_focuser
+    output_capturer
+    session_attacher
     window_closer
-    window_refresher
     """
 
     # ---- __init__ --------------------------------------------------------------------
     def __init__(self, preview_path: Path) -> None:
         """
         ---- Summary ----
-        Method to set up the window object without opening anything yet.
+        Method to set up the stand-in without writing anything yet.
 
         ---- Inputs ----
         preview_path : Path
-            Picture file used when no plot window can be opened.
+            Picture file the previews are saved to.
 
         ---- Globals read ----
         None.
@@ -80,67 +76,16 @@ class ViewerWindow:
         """
 
         self.preview_path = Path(preview_path)
-        self.is_window = False
-        self.backend_name: Optional[str] = None
-        self.fig: Optional[Figure] = None
-        self._has_tried = False
+        self.is_interactive = False
         self._has_opened_file = False
 
     # ---- WINDOW HELPERS --------------------------------------------------------------
-
-    # ---- _backend_starter ------------------------------------------------------------
-    def _backend_starter(self) -> None:
-        """
-        ---- Summary ----
-        Method to switch matplotlib to the first interactive backend that works, once.
-        The program normally runs on the non-interactive Agg backend.
-
-        ---- Inputs ----
-        None.
-
-        ---- Globals read ----
-        BACKENDS_MAC, BACKENDS_OTHER (module constants).
-
-        ---- Outputs ----
-        None
-            Nothing.
-
-        ---- Globals mutated ----
-        None. Switches the matplotlib backend and sets is_window and backend_name
-        (side effects).
-
-        ---- Equations ----
-        None.
-
-        ---- Helpers ----
-        None.
-        """
-
-        if self._has_tried:
-            return
-        self._has_tried = True
-        if sys.platform not in ('win32', 'darwin') and not (
-                os.environ.get('DISPLAY') or os.environ.get('WAYLAND_DISPLAY')):
-            return  # no display, so no window can open
-        for name in (BACKENDS_MAC if sys.platform == 'darwin' else BACKENDS_OTHER):
-            try:
-                plt.switch_backend(name)
-                self.fig = plt.figure(WINDOW_TITLE, dpi=PREVIEW_DPI)
-            except Exception:  # missing GUI library, or no display: try the next one
-                plt.close('all')
-                continue
-            self.is_window = True
-            self.backend_name = name
-            plt.ion()
-            return
-        plt.switch_backend('Agg')
 
     # ---- _file_opener ----------------------------------------------------------------
     def _file_opener(self) -> None:
         """
         ---- Summary ----
-        Method to open the preview picture in the default picture viewer (once), so the
-        preview can be seen without a plot window.
+        Method to open the preview picture in the default picture viewer (once).
 
         ---- Inputs ----
         None.
@@ -181,93 +126,16 @@ class ViewerWindow:
 
     # ---- MAIN METHODS ----------------------------------------------------------------
 
-    # ---- figure_getter ---------------------------------------------------------------
-    def figure_getter(self) -> Figure:
+    # ---- figure_shower ---------------------------------------------------------------
+    def figure_shower(self, figure: Figure) -> None:
         """
         ---- Summary ----
-        Method to give the figure to draw the next preview in. The plot window is opened
-        on the first call and opened again if the user closed it.
+        Method to save the preview figure to the picture file and tell the user where it
+        is.
 
         ---- Inputs ----
-        None.
-
-        ---- Globals read ----
-        PREVIEW_DPI, WINDOW_TITLE (module constants).
-
-        ---- Outputs ----
-        Figure
-            The figure; the caller clears and redraws it.
-
-        ---- Globals mutated ----
-        None. May open the plot window and prints a note when it falls back to a picture
-        file (side effects).
-
-        ---- Equations ----
-        None.
-
-        ---- Helpers ----
-        _backend_starter
-        """
-
-        # ---- 1 Open the window the first time ----------------------------------------
-        was_tried = self._has_tried
-        self._backend_starter()
-        if not was_tried and not self.is_window:
-            print(f'No plot window can be opened here, so each preview is saved as a '
-                  f'picture instead: {self.preview_path}',
-                  )
-
-        # ---- 2 Reopen a window the user closed ---------------------------------------
-        is_closed = self.fig is None or not plt.fignum_exists(self.fig.number)
-        if self.is_window and is_closed:
-            self.fig = plt.figure(WINDOW_TITLE, dpi=PREVIEW_DPI)
-        if not self.is_window and self.fig is None:
-            self.fig = Figure(dpi=PREVIEW_DPI)
-        return self.fig
-
-    # ---- window_closer ---------------------------------------------------------------
-    def window_closer(self) -> None:
-        """
-        ---- Summary ----
-        Method to close the plot window and put matplotlib back on the Agg backend, so
-        the rest of the run draws and saves figures as it always did.
-
-        ---- Inputs ----
-        None.
-
-        ---- Globals read ----
-        None.
-
-        ---- Outputs ----
-        None
-            Nothing.
-
-        ---- Globals mutated ----
-        None. Closes all figures and switches the matplotlib backend (side effects).
-
-        ---- Equations ----
-        None.
-
-        ---- Helpers ----
-        None.
-        """
-
-        plt.close('all')
-        if self.is_window:
-            plt.ioff()
-            plt.switch_backend('Agg')
-        self.is_window = False
-        self.fig = None
-
-    # ---- window_refresher ------------------------------------------------------------
-    def window_refresher(self) -> None:
-        """
-        ---- Summary ----
-        Method to show the figure that was just drawn: repaint the plot window, or save
-        the picture file and tell the user where it is.
-
-        ---- Inputs ----
-        None.
+        figure : Figure
+            The drawn preview.
 
         ---- Globals read ----
         PREVIEW_DPI (module constant).
@@ -277,7 +145,7 @@ class ViewerWindow:
             Nothing.
 
         ---- Globals mutated ----
-        None. Repaints the window or writes the preview picture (side effects).
+        None. Writes the picture file and prints its path (side effects).
 
         ---- Equations ----
         None.
@@ -286,10 +154,118 @@ class ViewerWindow:
         _file_opener
         """
 
-        if self.is_window:
-            self.fig.canvas.draw_idle()
-            plt.pause(0.1)  # lets the window paint before the terminal waits for typing
-            return
-        self.fig.savefig(self.preview_path, dpi=PREVIEW_DPI)
+        figure.savefig(self.preview_path, dpi=PREVIEW_DPI)
         print(f'  Preview picture: {self.preview_path}')
         self._file_opener()
+
+    # ---- file_focuser ----------------------------------------------------------------
+    def file_focuser(self, name: str) -> None:
+        """
+        ---- Summary ----
+        Method that does nothing: a picture file has no file selector.
+
+        ---- Inputs ----
+        name : str
+            Name of the file being asked about.
+
+        ---- Globals read ----
+        None.
+
+        ---- Outputs ----
+        None
+            Nothing.
+
+        ---- Globals mutated ----
+        None.
+
+        ---- Equations ----
+        None.
+
+        ---- Helpers ----
+        None.
+        """
+
+    # ---- output_capturer -------------------------------------------------------------
+    @contextmanager
+    def output_capturer(self) -> Iterator[io.StringIO]:
+        """
+        ---- Summary ----
+        Method to capture what the processing of a preview prints, so it does not
+        clutter the questions.
+
+        ---- Inputs ----
+        None.
+
+        ---- Globals read ----
+        None.
+
+        ---- Outputs ----
+        Iterator[io.StringIO]
+            The buffer the output is collected in.
+
+        ---- Globals mutated ----
+        None. Replaces sys.stdout while the block runs (side effect).
+
+        ---- Equations ----
+        None.
+
+        ---- Helpers ----
+        None.
+        """
+
+        buffer = io.StringIO()
+        with redirect_stdout(buffer):
+            yield buffer
+
+    # ---- session_attacher ------------------------------------------------------------
+    def session_attacher(self, session: Any) -> None:
+        """
+        ---- Summary ----
+        Method that does nothing: the picture needs no list of files.
+
+        ---- Inputs ----
+        session : Any
+            The browser session.
+
+        ---- Globals read ----
+        None.
+
+        ---- Outputs ----
+        None
+            Nothing.
+
+        ---- Globals mutated ----
+        None.
+
+        ---- Equations ----
+        None.
+
+        ---- Helpers ----
+        None.
+        """
+
+    # ---- window_closer ---------------------------------------------------------------
+    def window_closer(self) -> None:
+        """
+        ---- Summary ----
+        Method that does nothing: the picture file stays where it is.
+
+        ---- Inputs ----
+        None.
+
+        ---- Globals read ----
+        None.
+
+        ---- Outputs ----
+        None
+            Nothing.
+
+        ---- Globals mutated ----
+        None.
+
+        ---- Equations ----
+        None.
+
+        ---- Helpers ----
+        None.
+        """
